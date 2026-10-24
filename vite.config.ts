@@ -1,12 +1,41 @@
+import fs from 'node:fs';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, Plugin} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
+
+function apkDownloadPlugin(): Plugin {
+  return {
+    name: 'apk-download-plugin',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url?.split('?')[0];
+        if (url && (url.startsWith('/downloads/') || url.endsWith('.apk') || url.endsWith('.tar.gz'))) {
+          const relativePath = url.startsWith('/') ? url.slice(1) : url;
+          const filePath = path.resolve(process.cwd(), 'public', relativePath);
+          if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+            const fileName = path.basename(filePath);
+            const contentType = fileName.endsWith('.apk') 
+              ? 'application/vnd.android.package-archive'
+              : 'application/gzip';
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+            res.setHeader('Content-Length', fs.statSync(filePath).size);
+            return fs.createReadStream(filePath).pipe(res);
+          }
+        }
+        next();
+      });
+    },
+  };
+}
 
 export default defineConfig(() => {
   return {
+    base: './',
     plugins: [
+      apkDownloadPlugin(),
       react(),
       tailwindcss(),
       VitePWA({
@@ -78,8 +107,7 @@ export default defineConfig(() => {
           ],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
     ],

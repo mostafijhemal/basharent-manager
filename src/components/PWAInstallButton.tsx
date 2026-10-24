@@ -102,10 +102,10 @@ export const PWAInstallButton: React.FC<{
     <>
       <button
         onClick={() => setShowGuide(true)}
-        className="px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5"
+        className="px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-2 shadow-sm"
       >
-        <Smartphone className="w-3.5 h-3.5" />
-        <span>{isBn ? 'ফোনে ইনস্টল করুন' : 'Install on Phone'}</span>
+        <Download className="w-3.5 h-3.5 text-emerald-400" />
+        <span>{isBn ? 'APK ডাউনলোড ও ইনস্টল' : 'Download APK'}</span>
       </button>
 
       {showGuide && (
@@ -114,8 +114,8 @@ export const PWAInstallButton: React.FC<{
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">
                 {isBn
-                  ? 'অ্যান্ড্রয়েড ফোনে ইনস্টল করার নিয়ম (Option 1)'
-                  : 'How to Open & Install on Your Android Phone (Option 1)'}
+                  ? 'ফোনে ইনস্টল করার ২টি সহজ উপায়'
+                  : '2 Simple Ways to Install on Your Android Phone'}
               </h3>
               <button
                 onClick={() => setShowGuide(false)}
@@ -125,45 +125,45 @@ export const PWAInstallButton: React.FC<{
               </button>
             </div>
 
-            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-900 space-y-1.5">
-              <div className="font-bold flex items-center gap-1.5">
-                <Share2 className="w-4 h-4 text-amber-700 shrink-0" />
-                <span>
-                  {isBn
-                    ? 'গুরুত্বপূর্ণ ধাপ ১: AI Studio থেকে পাবলিক লিংক চালু করুন'
-                    : 'Step 1 (Required): Enable the Shared Link in AI Studio First'}
+            {/* Direct APK Option (Best) */}
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-4 text-xs text-emerald-950 space-y-2.5">
+              <div className="font-bold text-sm text-emerald-900 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Download className="w-4 h-4 text-emerald-700 shrink-0" />
+                  {isBn ? 'উপায় ১: সাইন করা APK সরাসরি ডাউনলোড (সবচেয়ে সহজ)' : 'Method 1: Direct Signed APK Download (Fastest)'}
                 </span>
+                <span className="text-[10px] bg-emerald-200/80 px-2 py-0.5 rounded text-emerald-800 font-mono">720 KB</span>
               </div>
-              <p className="leading-relaxed">
+              <p className="text-emerald-800 leading-relaxed">
                 {isBn
-                  ? 'AI Studio-এর প্রিভিউ লিংকটি ডিফল্টভাবে প্রাইভেট থাকে। আপনার ফোনে লিংকটি চালু করতে পিসির স্ক্রিনের একদম উপরে ডানপাশে AI Studio-এর "Share" বা "Deploy" (রকেট/শেয়ার আইকন) বাটনে ক্লিক করে অ্যাপটি পাবলিক বা শেয়ার করুন, অথবা নিচের বাটন থেকে ফুল-স্ক্রিন ট্যাবে খুলুন।'
-                  : 'By default, AI Studio blocks direct phone access until you enable sharing. Look at the top-right corner of the Google AI Studio toolbar (above this preview frame) and click the "Share" or "Deploy" button to activate the public URL for your phone.'}
+                  ? 'Chrome ব্রাউজারের কোনো সীমাবদ্ধতা ছাড়া আসল অ্যান্ড্রয়েড অ্যাপ হিসেবে ইনস্টল করুন।'
+                  : 'Pre-compiled, signed Android release package (TargetSDK 33, MinSDK 21) that installs cleanly on any Android phone.'}
               </p>
+              <a
+                href="/downloads/BashaRentManager.apk"
+                download="BashaRentManager.apk"
+                className="w-full py-2.5 text-xs font-bold text-slate-950 bg-emerald-400 rounded-lg hover:bg-emerald-300 transition-colors flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                <span>{isBn ? 'BashaRentManager.apk ডাউনলোড করুন' : 'Download BashaRentManager.apk'}</span>
+              </a>
             </div>
 
-            <div className="space-y-2.5 text-xs text-slate-700">
-              <div className="font-bold text-slate-900">
-                {isBn
-                  ? 'ধাপ ২: ফোনের Chrome ব্রাউজারে ইনস্টল করুন'
-                  : 'Step 2: Open in Chrome on Your Phone & Tap Install'}
+            {/* Chrome Shortcut Explanation for their screenshot */}
+            <div className="space-y-2 text-xs text-slate-700 rounded-xl bg-slate-50 border border-slate-200 p-3.5">
+              <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Smartphone className="w-4 h-4 text-slate-700 shrink-0" />
+                <span>
+                  {isBn
+                    ? 'উপায় ২: আপনার স্ক্রিনশটের "Create shortcut" বাটনে চাপুন'
+                    : 'Method 2: Tap "Create shortcut" on your Chrome screen'}
+                </span>
               </div>
-              <ol className="space-y-1.5 list-decimal list-inside leading-relaxed">
-                <li>
-                  {isBn
-                    ? 'Share/Deploy চালু করার পর প্রাপ্ত লিংকটি আপনার অ্যান্ড্রয়েড ফোনের Google Chrome ব্রাউজারে খুলুন।'
-                    : 'Open the shared link in Google Chrome on your Android phone (make sure you are signed into the same Google account if set to Restricted).'}
-                </li>
-                <li>
-                  {isBn
-                    ? 'Chrome-এর উপরে ডানপাশে তিন ডট মেনুতে (⋮) ট্যাপ করে "Install app" বা "Add to Home screen" নির্বাচন করুন।'
-                    : 'Tap the Chrome menu (⋮) in the top-right corner and tap "Install app" or "Add to Home screen".'}
-                </li>
-                <li>
-                  {isBn
-                    ? 'ইনস্টল হয়ে গেলে অ্যাপটি ইন্টারনেট ছাড়াই (Offline) আপনার ফোনে কাজ করবে।'
-                    : 'Once installed on your home screen, BashaRent Manager runs 100% offline.'}
-                </li>
-              </ol>
+              <p className="text-slate-600 leading-relaxed">
+                {isBn
+                  ? 'Chrome-এ "This app cannot be installed" দেখালে নিচে থাকা নীল রঙের "Create shortcut" বোতামে চাপুন। এটি সাথে সাথে আপনার ফোনের হোম স্ক্রিনে অ্যাপের আইকন তৈরি করে দেবে এবং অফলাইনে সম্পূর্ণ কাজ করবে।'
+                  : 'If Chrome displays "This app cannot be installed", simply tap the blue "Create shortcut" button shown on your screen. It adds the icon to your home screen and operates 100% offline via the active Service Worker.'}
+              </p>
             </div>
 
             <div className="p-3 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-between gap-2">

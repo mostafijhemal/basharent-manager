@@ -4,12 +4,16 @@ import {
   Archive,
   Building2,
   CheckCircle2,
+  ChevronRight,
   CreditCard,
   Download,
   FileSpreadsheet,
   FileText,
+  Home,
   KeyRound,
   Lock,
+  Menu,
+  Phone,
   Plus,
   Printer,
   Receipt,
@@ -21,14 +25,15 @@ import {
   Smartphone,
   Trash2,
   Upload,
+  UserPlus,
   Users,
   Wallet,
   Wrench,
+  X,
   Zap,
 } from 'lucide-react';
 import { AndroidDeliveryView } from './components/AndroidDeliveryView';
 import { PinLockOverlay } from './components/PinLockOverlay';
-import { PWAInstallButton } from './components/PWAInstallButton';
 import { ReceiptModal } from './components/ReceiptModal';
 import {
   createEncryptedBackup,
@@ -112,6 +117,31 @@ export function App() {
   } | null>(null);
   const [receiptModalCtx, setReceiptModalCtx] =
     useState<ReceiptRenderContext | null>(null);
+
+  // User-friendly modal & drawer toggles (progressive disclosure instead of cluttered forms)
+  const [activeBldModal, setActiveBldModal] = useState<
+    'NONE' | 'BUILDING' | 'FLOOR' | 'UNIT'
+  >('NONE');
+  const [showDepositModal, setShowDepositModal] = useState<boolean>(false);
+  const [billTabMode, setBillTabMode] = useState<'UTILITY' | 'SHARED'>(
+    'UTILITY'
+  );
+  const [showExpenseModal, setShowExpenseModal] = useState<boolean>(false);
+  const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
+
+  // Detect if running inside the installed Android APK or standalone app vs Web browser
+  const isApkVersion = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const isFileProtocol = window.location.protocol === 'file:';
+    const hasApkQuery = window.location.search.includes('mode=apk');
+    const hasApkUserAgent =
+      typeof navigator !== 'undefined' &&
+      navigator.userAgent.includes('BashaRentNativeAPK');
+    const isStandalone =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(display-mode: standalone)').matches;
+    return isFileProtocol || hasApkQuery || hasApkUserAgent || isStandalone;
+  }, []);
 
   // Sub-state for Buildings tab
   const [newBldName, setNewBldName] = useState('');
@@ -492,6 +522,7 @@ export function App() {
     setNewBldName('');
     setNewBldAddress('');
     setNewBldNotes('');
+    setActiveBldModal('NONE');
     notify(isBn ? 'নতুন ভবন সংরক্ষিত হয়েছে।' : 'Building added successfully.');
   };
 
@@ -519,6 +550,7 @@ export function App() {
       return draft;
     });
     setNewFloorName('');
+    setActiveBldModal('NONE');
     notify(isBn ? 'নতুন তলা যুক্ত হয়েছে।' : 'Floor added to building.');
   };
 
@@ -580,6 +612,7 @@ export function App() {
       }
     );
     setNewUnitNum('');
+    setActiveBldModal('NONE');
     notify(isBn ? 'নতুন ফ্ল্যাট সংরক্ষিত হয়েছে।' : 'Rental unit created.');
   };
 
@@ -852,6 +885,7 @@ export function App() {
     );
     setDepTxAmountTaka('');
     setDepTxReason('');
+    setShowDepositModal(false);
     notify(
       isBn
         ? 'জামানত লেনদেন ও অডিট রেকর্ড সংরক্ষিত হয়েছে।'
@@ -895,6 +929,7 @@ export function App() {
       }
     );
     setNewMonthlyRentTaka('');
+    setShowDepositModal(false);
     notify(
       isBn
         ? 'নতুন ভাড়া সংরক্ষিত হয়েছে (পূর্বের হিসাব অপরিবর্তিত)।'
@@ -1380,6 +1415,7 @@ export function App() {
     setExpAmountTaka('');
     setExpDesc('');
     setExpVendor('');
+    setShowExpenseModal(false);
     notify(isBn ? 'খরচ সংরক্ষিত হয়েছে।' : 'Property expense recorded.');
   };
 
@@ -1617,524 +1653,452 @@ export function App() {
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-      {/* Top Bar Contract: Zone 1 (Wordmark) — Zone 2 (5 Single-Line Nav Links) — Zone 3 (1 Primary Action) */}
-      <header className="sticky top-0 z-30 flex items-center justify-between gap-8 px-6 py-3.5 bg-white border-b border-slate-200 no-print">
-        <button
-          onClick={() => setActiveTab('DASHBOARD')}
-          className="text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0 text-left"
-        >
-          {db.settings.appName}
-        </button>
+  // Navigation items — "APK ডাউনলোড" (ANDROID_APK) is shown ONLY in Web version, hidden inside APK
+  const navItems = (
+    [
+      ['DASHBOARD', isBn ? 'হোম ও ড্যাশবোর্ড' : 'Home & Overview', Home],
+      ['COLLECTION', isBn ? 'ভাড়া আদায় ও রসিদ' : 'Collect Rent', CreditCard],
+      ['BUILDINGS', isBn ? 'ভবন ও ফ্ল্যাট' : 'Buildings & Flats', Building2],
+      ['TENANTS', isBn ? 'ভাড়াটিয়া তালিকা' : 'Tenants & Deposits', Users],
+      ['BILLS', isBn ? 'বিদ্যুৎ ও গ্যাস বিল' : 'Utility & Shared Bills', Zap],
+      ['EXPENSES', isBn ? 'ভবনের খরচ' : 'Property Expenses', Wrench],
+      ['REPORTS', isBn ? 'হিসাব ও রিপোর্ট' : 'Reports & Ledger', FileSpreadsheet],
+      ['SETTINGS', isBn ? 'সেটিংস ও ব্যাকআপ' : 'Settings & Backup', Settings],
+      ...(!isApkVersion
+        ? ([
+            [
+              'ANDROID_APK',
+              isBn ? 'APK ডাউনলোড' : 'Download APK',
+              Smartphone,
+            ],
+          ] as const)
+        : []),
+    ] as const
+  );
 
-        <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-600">
-          <button
-            onClick={() => setActiveTab('DASHBOARD')}
-            className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 pb-0.5 ${
-              activeTab === 'DASHBOARD'
-                ? 'text-slate-900 border-b-2 border-emerald-600 font-semibold'
-                : ''
-            }`}
-          >
-            {isBn ? 'ড্যাশবোর্ড' : 'Dashboard'}
-          </button>
-          <button
-            onClick={() => setActiveTab('BUILDINGS')}
-            className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 pb-0.5 ${
-              activeTab === 'BUILDINGS'
-                ? 'text-slate-900 border-b-2 border-emerald-600 font-semibold'
-                : ''
-            }`}
-          >
-            {isBn ? 'ভবন ও ফ্ল্যাট' : 'Buildings'}
-          </button>
-          <button
-            onClick={() => setActiveTab('TENANTS')}
-            className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 pb-0.5 ${
-              activeTab === 'TENANTS'
-                ? 'text-slate-900 border-b-2 border-emerald-600 font-semibold'
-                : ''
-            }`}
-          >
-            {isBn ? 'ভাড়াটিয়া' : 'Tenants'}
-          </button>
+  return (
+    <div className="min-h-screen flex bg-[#F4F7F6] text-slate-900">
+      {/* Desktop Clean & Friendly Sidebar */}
+      <aside className="hidden lg:flex lg:w-68 xl:w-72 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-slate-200/90 z-40 no-print select-none">
+        {/* Brand Header */}
+        <div className="h-20 px-6 flex items-center gap-3.5 border-b border-slate-100">
+          <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-sm shrink-0">
+            <Building2 className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-base font-bold text-slate-900 tracking-tight truncate">
+              {db.settings.appName}
+            </div>
+            <div className="text-xs text-slate-500 truncate mt-0.5">
+              {isBn ? 'সহজ বাড়িভাড়া ও হিসাব খাতা' : 'Easy Rent & Property Book'}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Primary Action Button in Sidebar */}
+        <div className="px-4 pt-5 pb-2">
           <button
             onClick={() => setActiveTab('COLLECTION')}
-            className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 pb-0.5 ${
-              activeTab === 'COLLECTION'
-                ? 'text-slate-900 border-b-2 border-emerald-600 font-semibold'
-                : ''
-            }`}
+            className="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
-            {isBn ? 'ভাড়া আদায়' : 'Rent Collection'}
+            <CreditCard className="w-4 h-4" />
+            <span>{isBn ? '+ ভাড়া আদায় করুন' : '+ Collect Rent Now'}</span>
           </button>
-          <button
-            onClick={() => setActiveTab('REPORTS')}
-            className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 pb-0.5 ${
-              activeTab === 'REPORTS'
-                ? 'text-slate-900 border-b-2 border-emerald-600 font-semibold'
-                : ''
-            }`}
-          >
-            {isBn ? 'রিপোর্ট' : 'Reports'}
-          </button>
-        </nav>
-
-        <div className="flex items-center gap-3 shrink-0">
-          <PWAInstallButton
-            lang={lang}
-            onOpenAndroidCenter={() => setActiveTab('ANDROID_APK')}
-          />
         </div>
-      </header>
 
-      {/* Secondary Workspace Toolbar (Below Header) */}
-      <div className="bg-slate-900 text-slate-200 px-6 py-2.5 border-b border-slate-800 no-print">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
-          {/* Secondary Module Switcher */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {(
-              [
-                ['DASHBOARD', isBn ? 'ড্যাশবোর্ড' : 'Dashboard'],
-                ['BUILDINGS', isBn ? 'ভবন ও ফ্ল্যাট' : 'Buildings & Units'],
-                ['TENANTS', isBn ? 'ভাড়াটিয়া ও জামানত' : 'Tenants & Deposits'],
-                ['COLLECTION', isBn ? 'ভাড়া আদায় ও রসিদ' : 'Collect & Receipts'],
-                ['BILLS', isBn ? 'বিদ্যুৎ/গ্যাস ও যৌথ বিল' : 'Utilities & Shared'],
-                ['EXPENSES', isBn ? 'ভবনের খরচ' : 'Expenses'],
-                ['REPORTS', isBn ? 'আর্থিক রিপোর্ট ও অডিট' : 'Reports & Audit'],
-                ['SETTINGS', isBn ? 'সেটিংস ও ব্যাকআপ' : 'Settings & Backup'],
-                ['ANDROID_APK', isBn ? 'অ্যান্ড্রয়েড ও APK' : 'Android APK & Source'],
-              ] as [NavTab, string][]
-            ).map(([tabKey, label]) => (
+        {/* Single Clean Navigation List */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5">
+          {navItems.map(([tabKey, label, Icon]) => {
+            const active = activeTab === tabKey;
+            return (
               <button
                 key={tabKey}
-                onClick={() => setActiveTab(tabKey)}
-                className={`px-2.5 py-1.5 rounded-md font-medium transition-colors whitespace-nowrap shrink-0 ${
-                  activeTab === tabKey
-                    ? 'bg-emerald-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                onClick={() => setActiveTab(tabKey as NavTab)}
+                className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm transition-all cursor-pointer ${
+                  active
+                    ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/80 shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 font-medium border border-transparent'
                 }`}
               >
-                {label}
+                <Icon
+                  className={`w-5 h-5 shrink-0 ${
+                    active ? 'text-emerald-600' : 'text-slate-400'
+                  }`}
+                />
+                <span className="truncate">{label}</span>
               </button>
+            );
+          })}
+        </div>
+
+        {/* Sidebar Footer: Role Switcher */}
+        <div className="p-4 border-t border-slate-200/80 bg-slate-50/70 space-y-2">
+          <label className="block text-xs font-semibold text-slate-500">
+            {isBn ? 'ব্যবহারকারী মোড (Role)' : 'Active User Role'}
+          </label>
+          <select
+            aria-label="Active User Role"
+            value={db.activeUserId}
+            onChange={(e) =>
+              commitDb((d) => {
+                d.activeUserId = e.target.value;
+                return d;
+              })
+            }
+            className="w-full bg-white border border-slate-200 text-slate-800 rounded-xl px-3 py-2 text-sm font-medium"
+          >
+            {db.users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.role === 'OWNER'
+                  ? isBn
+                    ? `বাড়িওয়ালা: ${u.name}`
+                    : `Owner: ${u.name}`
+                  : isBn
+                  ? `ম্যানেজার: ${u.name}`
+                  : `Manager: ${u.name}`}
+              </option>
             ))}
+          </select>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col lg:pl-68 xl:pl-72 min-w-0">
+        {/* Clean, Friendly Top Header (NO duplicate nav links, NO redundant top APK button) */}
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 h-16 flex items-center justify-between gap-3 no-print">
+          {/* Mobile Brand / Desktop Current Section Title */}
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              onClick={() => setActiveTab('DASHBOARD')}
+              className="lg:hidden w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0"
+            >
+              <Building2 className="w-5 h-5" />
+            </button>
+            <div className="min-w-0">
+              <div className="text-base sm:text-lg font-bold text-slate-900 truncate">
+                {activeTab === 'DASHBOARD' && (isBn ? 'হোম ও ড্যাশবোর্ড' : 'Dashboard')}
+                {activeTab === 'BUILDINGS' && (isBn ? 'ভবন ও ফ্ল্যাট তালিকা' : 'Buildings & Flats')}
+                {activeTab === 'TENANTS' && (isBn ? 'ভাড়াটিয়া ও জামানত' : 'Tenants & Deposits')}
+                {activeTab === 'COLLECTION' && (isBn ? 'ভাড়া আদায় ও রসিদ' : 'Rent Collection')}
+                {activeTab === 'BILLS' && (isBn ? 'বিদ্যুৎ, গ্যাস ও যৌথ বিল' : 'Utility Bills')}
+                {activeTab === 'EXPENSES' && (isBn ? 'ভবনের রক্ষণাবেক্ষণ খরচ' : 'Property Expenses')}
+                {activeTab === 'REPORTS' && (isBn ? 'হিসাব ও আর্থিক রিপোর্ট' : 'Financial Reports')}
+                {activeTab === 'SETTINGS' && (isBn ? 'সেটিংস ও ব্যাকআপ' : 'Settings & Backup')}
+                {activeTab === 'ANDROID_APK' && (isBn ? 'মোবাইল অ্যাপ (APK ডাউনলোড)' : 'Android APK Download')}
+              </div>
+            </div>
           </div>
 
-          {/* Language, Role Profile, Period & Demo Controls */}
-          <div className="flex flex-wrap items-center gap-3">
-            {db.settings.isDemoData && (
-              <span className="text-amber-300 font-medium whitespace-nowrap">
-                {isBn ? 'ডেমো ডাটা মোড' : 'Demo Data Active'} ·
+          {/* Right Controls: Month Picker & Language Switcher Only */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex items-center gap-2 bg-slate-100/90 border border-slate-200/80 rounded-xl px-3 py-1.5">
+              <span className="hidden sm:inline text-xs font-semibold text-slate-600">
+                {isBn ? 'হিসাবের মাস:' : 'Month:'}
               </span>
-            )}
-            <select
-              aria-label="Active User Role"
-              value={db.activeUserId}
-              onChange={(e) =>
-                commitDb((d) => {
-                  d.activeUserId = e.target.value;
-                  return d;
-                })
-              }
-              className="bg-slate-800 border border-slate-700 text-slate-100 rounded px-2 py-1 text-xs"
-            >
-              {db.users.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.role}: {u.name}
-                </option>
-              ))}
-            </select>
-
-            <input
-              type="month"
-              aria-label="Billing Period"
-              value={selectedPeriod}
-              onChange={(e) =>
-                setSelectedPeriod(e.target.value || getDhakaBillingPeriod())
-              }
-              className="bg-slate-800 border border-slate-700 text-slate-100 rounded px-2 py-1 text-xs font-mono"
-            />
+              <input
+                type="month"
+                aria-label="Billing Period"
+                value={selectedPeriod}
+                onChange={(e) =>
+                  setSelectedPeriod(e.target.value || getDhakaBillingPeriod())
+                }
+                className="bg-transparent text-slate-900 text-sm font-bold font-mono focus:outline-none"
+              />
+            </div>
 
             <button
               onClick={() =>
                 commitDb((d) => {
-                  d.settings.language = d.settings.language === 'en' ? 'bn' : 'en';
+                  d.settings.language =
+                    d.settings.language === 'en' ? 'bn' : 'en';
                   return d;
                 })
               }
-              className="px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-emerald-400 font-semibold hover:bg-slate-700 whitespace-nowrap"
+              className="px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs sm:text-sm font-bold hover:bg-slate-800 transition-colors cursor-pointer"
             >
               {isBn ? 'English' : 'বাংলা'}
             </button>
           </div>
-        </div>
-      </div>
+        </header>
 
-      {/* Toast Notification Banner */}
-      {toast && (
-        <div className="fixed bottom-20 lg:bottom-6 right-6 z-50 max-w-md rounded-xl bg-slate-900 text-white px-4 py-3 shadow-xl border border-slate-700 flex items-center gap-2.5 text-xs">
-          <CheckCircle2
-            className={`w-4 h-4 shrink-0 ${
-              toast.type === 'error' ? 'text-red-400' : 'text-emerald-400'
-            }`}
-          />
-          <span>{toast.text}</span>
-        </div>
-      )}
+        {/* Friendly Toast Notification */}
+        {toast && (
+          <div className="fixed bottom-20 lg:bottom-6 right-4 sm:right-6 z-50 max-w-md rounded-2xl bg-slate-900 text-white px-5 py-3.5 shadow-2xl border border-slate-700 flex items-center gap-3 text-sm font-medium">
+            <CheckCircle2
+              className={`w-5 h-5 shrink-0 ${
+                toast.type === 'error' ? 'text-rose-400' : 'text-emerald-400'
+              }`}
+            />
+            <span>{toast.text}</span>
+          </div>
+        )}
 
-      {/* Main Content Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 lg:pb-12">
-        {/* ==================== 1. DASHBOARD ==================== */}
-        {activeTab === 'DASHBOARD' && (
-          <div className="space-y-6">
-            {/* Top Operational Bar */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900">
-                  {isBn
-                    ? `${formatBillingPeriod(selectedPeriod, 'bn')} — আর্থিক ড্যাশবোর্ড`
-                    : `${formatBillingPeriod(selectedPeriod, 'en')} Financial Overview`}
-                </h1>
-                <p className="text-xs text-slate-500 mt-1">
-                  {isBn
-                    ? 'বাংলাদেশ সময় (Asia/Dhaka) অনুযায়ী অফলাইন রিলেশনাল লেজার। জামানত ভাড়ার আয়ের সাথে মিশ্রিত নয়।'
-                    : 'Offline-first SQLite/IndexedDB ledger in Bangladesh Time (Asia/Dhaka). Security deposits are strictly separated from operating rent income.'}
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2.5">
-                <select
-                  value={buildingFilter}
-                  onChange={(e) => setBuildingFilter(e.target.value)}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700"
-                >
-                  <option value="ALL">
-                    {isBn ? 'সকল ভবন (All Buildings)' : 'All Buildings'}
-                  </option>
-                  {db.buildings.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  onClick={handleGenerateMonthlyRent}
-                  className="px-3.5 py-2 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>
-                    {isBn ? 'মাসিক ভাড়া চার্জ তৈরি' : 'Generate Monthly Charges'}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('COLLECTION')}
-                  className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0"
-                >
-                  <CreditCard className="w-3.5 h-3.5" />
-                  <span>{isBn ? 'ভাড়া আদায় করুন' : 'Record Rent Payment'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* 4-Column Primary Financial KPI Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="rounded-xl bg-white border border-slate-200 p-5">
-                <div className="text-xs font-medium text-slate-500">
-                  {isBn
-                    ? 'মোট ধার্যকৃত ভাড়া ও বিল (এই মাস)'
-                    : 'Total Rent & Bills Charged'}
-                </div>
-                <div className="text-2xl font-bold text-slate-900 font-mono tabular-nums mt-1.5">
-                  {formatBDT(
-                    summary.totalRentChargedPoisha +
-                      summary.totalUtilityChargedPoisha,
-                    lang
-                  )}
-                </div>
-                <div className="text-xs text-slate-500 mt-2 font-mono tabular-nums">
-                  {isBn ? 'ভাড়া:' : 'Rent:'}{' '}
-                  {formatBDT(summary.totalRentChargedPoisha, lang)} ·{' '}
-                  {isBn ? 'বিল:' : 'Bills:'}{' '}
-                  {formatBDT(summary.totalUtilityChargedPoisha, lang)}
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-white border border-slate-200 p-5">
-                <div className="text-xs font-medium text-slate-500">
-                  {isBn
-                    ? 'নগদ/ব্যাংক আদায় (Collected Cash)'
-                    : 'Total Payments Collected'}
-                </div>
-                <div className="text-2xl font-bold text-emerald-700 font-mono tabular-nums mt-1.5">
-                  {formatBDT(summary.totalCashCollectedPoisha, lang)}
-                </div>
-                <div className="text-xs text-slate-500 mt-2">
-                  {isBn ? 'আদায়ের হার:' : 'Collection Rate:'}{' '}
-                  <span className="font-mono font-semibold text-slate-800">
-                    {isBn
-                      ? toBengaliDigits(summary.collectionRatePercent)
-                      : summary.collectionRatePercent}
-                    %
-                  </span>
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-white border border-slate-200 p-5">
-                <div className="text-xs font-medium text-slate-500">
-                  {isBn
-                    ? 'মোট বকেয়া (ভাড়া ও ইউটিলিটি)'
-                    : 'Total Outstanding Dues'}
-                </div>
-                <div className="text-2xl font-bold text-red-600 font-mono tabular-nums mt-1.5">
-                  {formatBDT(summary.totalOutstandingAllPeriodsPoisha, lang)}
-                </div>
-                <div className="text-xs text-slate-500 mt-2 font-mono tabular-nums">
-                  {isBn ? 'ভাড়া বকেয়া:' : 'Rent Due:'}{' '}
-                  {formatBDT(summary.outstandingRentPoisha, lang)} ·{' '}
-                  {isBn ? 'বিল:' : 'Utility:'}{' '}
-                  {formatBDT(summary.outstandingUtilityPoisha, lang)}
-                </div>
-              </div>
-
-              <div className="rounded-xl bg-white border border-slate-200 p-5">
-                <div className="text-xs font-medium text-slate-500">
-                  {isBn
-                    ? 'নিট অপারেটিং ক্যাশ ফ্লো (Net Cash Flow)'
-                    : 'Net Operating Cash Flow'}
-                </div>
-                <div className="text-2xl font-bold text-slate-900 font-mono tabular-nums mt-1.5">
-                  {formatBDT(summary.netOperatingCashFlowPoisha, lang)}
-                </div>
-                <div className="text-xs text-slate-500 mt-2 font-mono tabular-nums">
-                  {isBn ? 'খরচ:' : 'Expenses:'}{' '}
-                  {formatBDT(summary.totalExpensesPoisha, lang)} ·{' '}
-                  {isBn ? 'জামানত গচ্ছিত:' : 'Deposits Held:'}{' '}
-                  {formatBDT(summary.securityDepositsHeldPoisha, lang)}
-                </div>
-              </div>
-            </div>
-
-            {/* Secondary Occupancy & Collection Progress Strip */}
-            <div className="rounded-xl bg-white border border-slate-200 p-5">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-center">
-                <div>
-                  <div className="text-xs text-slate-500">
-                    {isBn ? 'ভাড়াকৃত ফ্ল্যাট (Occupied)' : 'Occupied Units'}
-                  </div>
-                  <div className="text-lg font-bold font-mono text-slate-900 mt-0.5">
-                    {summary.occupiedUnitsCount}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-slate-500">
-                    {isBn ? 'খালি ফ্ল্যাট (Vacant)' : 'Vacant Units'}
-                  </div>
-                  <div className="text-lg font-bold font-mono text-amber-600 mt-0.5">
-                    {summary.vacantUnitsCount}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-slate-500">
-                    {isBn ? 'সক্রিয় ভাড়াটিয়া' : 'Active Tenants'}
-                  </div>
-                  <div className="text-lg font-bold font-mono text-slate-900 mt-0.5">
-                    {summary.activeTenantsCount}
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-between text-xs text-slate-600 mb-1">
-                    <span>
-                      {isBn ? 'মাসিক আদায় অগ্রগতি' : 'Monthly Charge Settlement'}
-                    </span>
-                    <span className="font-mono font-semibold">
-                      {summary.collectionRatePercent}%
-                    </span>
-                  </div>
-                  <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-600 rounded-full transition-all"
-                      style={{ width: `${summary.collectionRatePercent}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Split Grid: Building-Wise Financial Breakdown & Overdue Reminders (5th, 10th, 15th) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Building Breakdown & Visual Chart (7 cols) */}
-              <div className="lg:col-span-7 rounded-xl bg-white border border-slate-200 p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold text-slate-900">
-                    {isBn
-                      ? 'ভবনভিত্তিক আয়, আদায়, বকেয়া ও খরচ'
-                      : 'Building-Wise Financial Reconciliation'}
-                  </h2>
-                  <span className="text-xs text-slate-500 font-mono">
-                    {selectedPeriod}
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2.5 pr-3 font-semibold">
-                          {isBn ? 'ভবন' : 'Building'}
-                        </th>
-                        <th className="py-2.5 px-3 text-right font-semibold">
-                          {isBn ? 'ধার্যকৃত' : 'Charged'}
-                        </th>
-                        <th className="py-2.5 px-3 text-right font-semibold">
-                          {isBn ? 'আদায়' : 'Collected'}
-                        </th>
-                        <th className="py-2.5 px-3 text-right font-semibold">
-                          {isBn ? 'বকেয়া' : 'Outstanding'}
-                        </th>
-                        <th className="py-2.5 pl-3 text-right font-semibold">
-                          {isBn ? 'খরচ' : 'Expenses'}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {summary.buildingBreakdown.map((b) => (
-                        <tr key={b.buildingId} className="hover:bg-slate-50">
-                          <td className="py-3 pr-3 font-semibold text-slate-900">
-                            {b.buildingName}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono tabular-nums text-slate-700">
-                            {formatBDT(b.chargedPoisha, lang)}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono tabular-nums text-emerald-700 font-semibold">
-                            {formatBDT(b.collectedPoisha, lang)}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono tabular-nums text-red-600 font-semibold">
-                            {formatBDT(b.outstandingPoisha, lang)}
-                          </td>
-                          <td className="py-3 pl-3 text-right font-mono tabular-nums text-slate-600">
-                            {formatBDT(b.expensesPoisha, lang)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Visual Income vs Expenses Bar Comparison */}
-                <div className="pt-3 border-t border-slate-100 space-y-2.5">
-                  <div className="text-xs font-semibold text-slate-700">
-                    {isBn
-                      ? 'আদায় বনাম খরচ ও বকেয়া তুলনাচিত্র'
-                      : 'Cash Collected vs. Operating Expenses & Outstanding Dues'}
-                  </div>
-                  {[
-                    {
-                      label: isBn ? 'নগদ আদায় (Collected)' : 'Cash Collected',
-                      val: summary.totalCashCollectedPoisha,
-                      color: 'bg-emerald-600',
-                    },
-                    {
-                      label: isBn ? 'মোট বকেয়া (Outstanding)' : 'Outstanding Dues',
-                      val: summary.totalOutstandingAllPeriodsPoisha,
-                      color: 'bg-red-500',
-                    },
-                    {
-                      label: isBn ? 'ভবনের খরচ (Expenses)' : 'Property Expenses',
-                      val: summary.totalExpensesPoisha,
-                      color: 'bg-amber-500',
-                    },
-                  ].map((bar) => {
-                    const maxVal = Math.max(
-                      1,
-                      summary.totalCashCollectedPoisha,
-                      summary.totalOutstandingAllPeriodsPoisha,
-                      summary.totalExpensesPoisha
-                    );
-                    const pct = Math.min(100, Math.round((bar.val * 100) / maxVal));
-                    return (
-                      <div key={bar.label} className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-slate-600">{bar.label}</span>
-                          <span className="font-mono tabular-nums font-semibold">
-                            {formatBDT(bar.val, lang)}
-                          </span>
-                        </div>
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${bar.color} rounded-full`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Overdue Reminders Panel (5th, 10th, 15th schedule) (5 cols) */}
-              <div className="lg:col-span-5 rounded-xl bg-white border border-slate-200 p-5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-base font-bold text-slate-900">
+        {/* Main Workspace Container */}
+        <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-8 py-6 pb-28 lg:pb-12">
+          {/* ==================== 1. USER-FRIENDLY DASHBOARD ==================== */}
+          {activeTab === 'DASHBOARD' && (
+            <div className="space-y-6">
+              {/* Friendly Welcome & Quick Action Banner */}
+              <div className="rounded-3xl bg-gradient-to-br from-emerald-800 via-emerald-700 to-teal-800 text-white p-6 sm:p-8 shadow-md">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 text-emerald-100 text-sm font-medium">
+                      <span>{formatBillingPeriod(selectedPeriod, isBn ? 'bn' : 'en')}</span>
+                      <span>·</span>
+                      <span>
+                        {isBn
+                          ? `মোট ${toBengaliDigits(summary.occupiedUnitsCount)}টি ফ্ল্যাটে ভাড়াটিয়া আছেন`
+                          : `${summary.occupiedUnitsCount} Flats Occupied`}
+                      </span>
+                    </div>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
                       {isBn
-                        ? 'বকেয়া ভাড়ার তাগাদা ও রিমাইন্ডার'
-                        : 'Overdue Rent & Utility Reminders'}
-                    </h2>
-                    <span className="text-xs text-slate-500">
-                      {isBn ? 'তারিখ: ৫, ১০, ১৫' : 'Schedule: 5th, 10th, 15th'}
+                        ? `স্বাগতম, ${activeUser.name}!`
+                        : `Welcome back, ${activeUser.name}!`}
+                    </h1>
+                    <p className="text-sm text-emerald-100/90 max-w-xl leading-relaxed">
+                      {isBn
+                        ? 'এখান থেকে এক ক্লিকে ভাড়া আদায় করুন, রসিদ তৈরি করুন এবং কোন কোন ফ্ল্যাটে ভাড়া বকেয়া আছে তা সহজেই দেখুন।'
+                        : 'Collect rent in one tap, share instant receipts, and track unpaid dues effortlessly.'}
+                    </p>
+                  </div>
+
+                  {/* 3 Big, Unmistakable Action Buttons */}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={() => setActiveTab('COLLECTION')}
+                      className="px-5 py-3.5 rounded-2xl bg-white text-emerald-900 font-bold text-sm shadow-sm hover:bg-emerald-50 transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <CreditCard className="w-4 h-4 text-emerald-600" />
+                      <span>{isBn ? 'ভাড়া আদায় করুন' : 'Collect Rent'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowAddTenantForm(true);
+                        setActiveTab('TENANTS');
+                      }}
+                      className="px-4 py-3.5 rounded-2xl bg-emerald-900/50 hover:bg-emerald-900/70 border border-emerald-400/30 text-white font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      <span>{isBn ? 'নতুন ভাড়াটিয়া' : 'Add Tenant'}</span>
+                    </button>
+
+                    <button
+                      onClick={handleGenerateMonthlyRent}
+                      className="px-4 py-3.5 rounded-2xl bg-emerald-900/50 hover:bg-emerald-900/70 border border-emerald-400/30 text-white font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>
+                        {isBn ? 'এই মাসের ভাড়া তৈরি' : 'Generate Month Rent'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Building Filter Bar inside Banner */}
+                {db.buildings.length > 1 && (
+                  <div className="mt-6 pt-5 border-t border-white/15 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-emerald-100 mr-1">
+                      {isBn ? 'ভবন বেছে নিন:' : 'Filter Building:'}
+                    </span>
+                    <button
+                      onClick={() => setBuildingFilter('ALL')}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        buildingFilter === 'ALL'
+                          ? 'bg-white text-emerald-900'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                      }`}
+                    >
+                      {isBn ? 'সব ভবন একসাথে' : 'All Buildings'}
+                    </button>
+                    {db.buildings.map((b) => (
+                      <button
+                        key={b.id}
+                        onClick={() => setBuildingFilter(b.id)}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          buildingFilter === b.id
+                            ? 'bg-white text-emerald-900'
+                            : 'bg-white/10 text-white hover:bg-white/20'
+                        }`}
+                      >
+                        {b.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 4 Big, Easy-to-Read Financial Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Card 1: Total Collected */}
+                <div className="rounded-2xl bg-white border border-slate-200/90 p-5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-600">
+                      {isBn ? 'এই মাসে আদায় হয়েছে' : 'Collected This Month'}
+                    </span>
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-bold text-emerald-600 font-mono tabular-nums mt-3">
+                    {formatBDT(summary.totalCashCollectedPoisha, lang)}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>{isBn ? 'আদায়ের অগ্রগতি' : 'Collection Rate'}</span>
+                    <span className="font-bold text-emerald-700 font-mono">
+                      {isBn
+                        ? toBengaliDigits(summary.collectionRatePercent)
+                        : summary.collectionRatePercent}
+                      %
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mb-4">
-                    {isBn
-                      ? 'প্রতি মাসের ৫, ১০ ও ১৫ তারিখে স্বয়ংক্রিয়ভাবে বকেয়া যাচাই করা হয়। WhatsApp বা SMS-এ তাগাদা পাঠান (এনআইডি নম্বর কখনোই পাঠানো হয় না)।'
-                      : 'Rechecked against live unpaid balances. Share polite Bengali/English reminders via WhatsApp or SMS (NID numbers are never included).'}
-                  </p>
+                </div>
+
+                {/* Card 2: Total Unpaid / Due */}
+                <div className="rounded-2xl bg-white border border-rose-200/90 p-5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-600">
+                      {isBn ? 'মোট বকেয়া আছে' : 'Total Unpaid Dues'}
+                    </span>
+                    <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                      <AlertTriangle className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-bold text-rose-600 font-mono tabular-nums mt-3">
+                    {formatBDT(summary.totalOutstandingAllPeriodsPoisha, lang)}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500">
+                    {isBn ? 'ভাড়া:' : 'Rent:'}{' '}
+                    {formatBDT(summary.outstandingRentPoisha, lang)} ·{' '}
+                    {isBn ? 'বিল:' : 'Bills:'}{' '}
+                    {formatBDT(summary.outstandingUtilityPoisha, lang)}
+                  </div>
+                </div>
+
+                {/* Card 3: Total Billed This Month */}
+                <div className="rounded-2xl bg-white border border-slate-200/90 p-5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-600">
+                      {isBn ? 'এই মাসের মোট ধার্য ভাড়া' : 'Total Billed This Month'}
+                    </span>
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                      <Wallet className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-bold text-slate-900 font-mono tabular-nums mt-3">
+                    {formatBDT(
+                      summary.totalRentChargedPoisha +
+                        summary.totalUtilityChargedPoisha,
+                      lang
+                    )}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500">
+                    {isBn ? 'ভাড়া:' : 'Rent:'}{' '}
+                    {formatBDT(summary.totalRentChargedPoisha, lang)} ·{' '}
+                    {isBn ? 'বিল:' : 'Bills:'}{' '}
+                    {formatBDT(summary.totalUtilityChargedPoisha, lang)}
+                  </div>
+                </div>
+
+                {/* Card 4: Net Hand Cash after Expenses */}
+                <div className="rounded-2xl bg-white border border-slate-200/90 p-5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-600">
+                      {isBn ? 'খরচ বাদে নিট জমা' : 'Net Cash After Expenses'}
+                    </span>
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Shield className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-bold text-slate-900 font-mono tabular-nums mt-3">
+                    {formatBDT(summary.netOperatingCashFlowPoisha, lang)}
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-500">
+                    {isBn ? 'ভবনের খরচ:' : 'Expenses:'}{' '}
+                    {formatBDT(summary.totalExpensesPoisha, lang)} ·{' '}
+                    {isBn ? 'জামানত:' : 'Held Deposit:'}{' '}
+                    {formatBDT(summary.securityDepositsHeldPoisha, lang)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Two-Column Friendly Overview: Who Needs to Pay vs Building Summary */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Left 6 Cols: Tenants with Unpaid Dues (1-Tap Collect or WhatsApp Reminder) */}
+                <div className="lg:col-span-6 rounded-2xl bg-white border border-slate-200/90 p-6 shadow-2xs space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">
+                        {isBn
+                          ? 'যাদের ভাড়া বা বিল বকেয়া আছে'
+                          : 'Tenants with Unpaid Rent'}
+                      </h2>
+                      <p className="text-sm text-slate-500 mt-0.5">
+                        {isBn
+                          ? 'এক ক্লিকে ভাড়া জমা নিন অথবা WhatsApp-এ তাগাদা পাঠান'
+                          : 'Collect payment in one tap or send a polite reminder'}
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 rounded-xl bg-rose-50 text-rose-700 font-bold text-xs">
+                      {reminderEval?.overdueItems.length || 0}{' '}
+                      {isBn ? 'জন বাকি' : 'Due'}
+                    </span>
+                  </div>
 
                   {reminderEval && reminderEval.overdueItems.length === 0 ? (
-                    <div className="p-6 text-center rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-500">
-                      {isBn
-                        ? 'আলহামদুলিল্লাহ! বর্তমানে কোনো ভাড়াটিয়ার বকেয়া নেই।'
-                        : 'All active tenants have zero outstanding balance.'}
+                    <div className="p-8 text-center rounded-2xl bg-emerald-50/60 border border-emerald-200/70 space-y-2">
+                      <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
+                      <div className="text-base font-bold text-emerald-900">
+                        {isBn
+                          ? 'আলহামদুলিল্লাহ! সকল ভাড়াটিয়ার ভাড়া পরিশোধিত আছে।'
+                          : 'All tenants have paid their rent!'}
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
                       {reminderEval?.overdueItems.map((item) => (
                         <div
                           key={item.eventKey}
-                          className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-2"
+                          className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 hover:border-slate-300 transition-all space-y-3"
                         >
-                          <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start justify-between gap-3">
                             <div>
-                              <div className="text-xs font-bold text-slate-900">
+                              <div className="text-base font-bold text-slate-900">
                                 {item.tenant.fullName}
                               </div>
-                              <div className="text-[11px] text-slate-500">
-                                {item.building.name} · {item.unit.unitNumber} ·{' '}
-                                <span className="font-mono">
-                                  {item.overduePeriods.join(', ')}
+                              <div className="text-sm text-slate-600 mt-0.5">
+                                {item.building.name} ·{' '}
+                                <span className="font-semibold text-slate-900">
+                                  {item.unit.unitNumber}
                                 </span>
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="text-xs font-bold text-red-600 font-mono tabular-nums">
-                                {formatBDT(item.outstandingPoisha, lang)}
+                              <div className="text-xs font-medium text-slate-500">
+                                {isBn ? 'বকেয়া টাকা' : 'Unpaid Due'}
                               </div>
-                              <div className="text-[10px] text-slate-500">
-                                {item.alreadyNotifiedToday
-                                  ? isBn
-                                    ? 'আজ তাগাদা পাঠানো হয়েছে'
-                                    : 'Reminded today'
-                                  : isBn
-                                  ? 'অপরিশোধিত'
-                                  : 'Overdue'}
+                              <div className="text-lg font-bold text-rose-600 font-mono tabular-nums">
+                                {formatBDT(item.outstandingPoisha, lang)}
                               </div>
                             </div>
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/70">
+                            <button
+                              onClick={() => {
+                                setColTenantId(item.tenant.id);
+                                setColAmountTaka(
+                                  String(item.outstandingPoisha / 100)
+                                );
+                                setActiveTab('COLLECTION');
+                              }}
+                              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <CreditCard className="w-4 h-4" />
+                              <span>{isBn ? 'ভাড়া জমা নিন' : 'Collect Rent'}</span>
+                            </button>
+
                             <button
                               onClick={() =>
                                 handleSendReminder(
@@ -2144,11 +2108,12 @@ export function App() {
                                   'WHATSAPP'
                                 )
                               }
-                              className="px-2.5 py-1.5 rounded bg-emerald-600 text-white text-[11px] font-semibold hover:bg-emerald-700 flex items-center gap-1"
+                              className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
                             >
-                              <Send className="w-3 h-3" />
+                              <Send className="w-3.5 h-3.5 text-emerald-600" />
                               <span>WhatsApp</span>
                             </button>
+
                             <button
                               onClick={() =>
                                 handleSendReminder(
@@ -2158,19 +2123,10 @@ export function App() {
                                   'SMS'
                                 )
                               }
-                              className="px-2.5 py-1.5 rounded bg-slate-800 text-white text-[11px] font-semibold hover:bg-slate-700 flex items-center gap-1"
+                              className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
                             >
-                              <Smartphone className="w-3 h-3" />
+                              <Phone className="w-3.5 h-3.5 text-slate-600" />
                               <span>SMS</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                setColTenantId(item.tenant.id);
-                                setActiveTab('COLLECTION');
-                              }}
-                              className="px-2.5 py-1.5 rounded bg-white border border-slate-300 text-slate-700 text-[11px] font-semibold hover:bg-slate-100 ml-auto"
-                            >
-                              {isBn ? 'আদায় করুন' : 'Collect Now'}
                             </button>
                           </div>
                         </div>
@@ -2178,459 +2134,657 @@ export function App() {
                     </div>
                   )}
                 </div>
+
+                {/* Right 6 Cols: Building-Wise Summary Cards */}
+                <div className="lg:col-span-6 rounded-2xl bg-white border border-slate-200/90 p-6 shadow-2xs space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">
+                        {isBn ? 'ভবনভিত্তিক হিসাব সংক্ষেপ' : 'Building Summary'}
+                      </h2>
+                      <p className="text-sm text-slate-500 mt-0.5">
+                        {isBn
+                          ? 'কোন ভবনে কত আদায় ও কত বকেয়া আছে'
+                          : 'Collection and dues for each property'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('BUILDINGS')}
+                      className="text-sm font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>{isBn ? 'ফ্ল্যাট দেখুন' : 'View Flats'}</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {summary.buildingBreakdown.map((b) => {
+                      const bUnits = db.units.filter(
+                        (u) => u.buildingId === b.buildingId
+                      );
+                      const occCount = bUnits.filter(
+                        (u) => u.status === 'OCCUPIED'
+                      ).length;
+                      return (
+                        <div
+                          key={b.buildingId}
+                          className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-base font-bold text-slate-900">
+                                {b.buildingName}
+                              </h3>
+                              <div className="text-xs text-slate-500 mt-0.5">
+                                {isBn
+                                  ? `মোট ${toBengaliDigits(bUnits.length)}টি ফ্ল্যাট · ${toBengaliDigits(occCount)}টিতে ভাড়াটিয়া আছেন`
+                                  : `${occCount} of ${bUnits.length} flats occupied`}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setBuildingFilter(b.buildingId);
+                                setActiveTab('BUILDINGS');
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
+                            >
+                              {isBn ? 'বিস্তারিত' : 'Manage'}
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/70 text-sm">
+                            <div>
+                              <div className="text-xs text-slate-500">
+                                {isBn ? 'আদায় হয়েছে' : 'Collected'}
+                              </div>
+                              <div className="font-bold font-mono text-emerald-700 mt-0.5">
+                                {formatBDT(b.collectedPoisha, lang)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500">
+                                {isBn ? 'বকেয়া আছে' : 'Unpaid'}
+                              </div>
+                              <div className="font-bold font-mono text-rose-600 mt-0.5">
+                                {formatBDT(b.outstandingPoisha, lang)}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500">
+                                {isBn ? 'ভবনের খরচ' : 'Expenses'}
+                              </div>
+                              <div className="font-bold font-mono text-slate-800 mt-0.5">
+                                {formatBDT(b.expensesPoisha, lang)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Payments & Instant Receipt Cards */}
+              <div className="rounded-2xl bg-white border border-slate-200/90 p-6 shadow-2xs space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">
+                      {isBn
+                        ? 'সাম্প্রতিক ভাড়া আদায় ও রসিদ'
+                        : 'Recent Rent Payments & Receipts'}
+                    </h2>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      {isBn
+                        ? 'যেকোনো পেমেন্টের রসিদ দেখতে বা ডাউনলোড করতে "রসিদ দেখুন" বাটনে চাপুন'
+                        : 'Tap "View Receipt" to print, download PDF/Image, or share on WhatsApp'}
+                    </p>
+                  </div>
+                </div>
+
+                {db.payments.length === 0 ? (
+                  <div className="text-sm text-slate-500 py-8 text-center bg-slate-50 rounded-2xl border border-slate-200/60">
+                    {isBn
+                      ? 'এখনো কোনো ভাড়া আদায় রেকর্ড করা হয়নি।'
+                      : 'No payments recorded yet.'}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {db.payments.slice(0, 6).map((p) => {
+                      const t = db.tenants.find((x) => x.id === p.tenantId);
+                      const b = db.buildings.find((x) => x.id === p.buildingId);
+                      const u = db.units.find((x) => x.id === p.unitId);
+                      return (
+                        <div
+                          key={p.id}
+                          className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/90 flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-base font-bold text-slate-900 truncate">
+                              {t?.fullName}{' '}
+                              <span className="text-sm font-medium text-slate-500">
+                                ({u?.unitNumber})
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-500 mt-1 font-mono">
+                              #{p.receiptNumber} · {p.paymentDate} · {p.method}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <div className="text-base font-bold font-mono text-emerald-700">
+                                {formatBDT(p.amountReceivedPoisha, lang)}
+                              </div>
+                            </div>
+                            {t && b && u && (
+                              <button
+                                onClick={() =>
+                                  setReceiptModalCtx({
+                                    payment: p,
+                                    tenant: t,
+                                    building: b,
+                                    unit: u,
+                                    settings: db.settings,
+                                    lang,
+                                  })
+                                }
+                                className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-900 text-xs sm:text-sm font-bold inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                              >
+                                <Receipt className="w-4 h-4 text-emerald-600" />
+                                <span>{isBn ? 'রসিদ দেখুন' : 'Receipt'}</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
+          )}
 
-            {/* Recent Payments & Receipts Table */}
-            <div className="rounded-xl bg-white border border-slate-200 p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-bold text-slate-900">
-                  {isBn
-                    ? 'সাম্প্রতিক ভাড়া আদায় ও রসিদসমূহ'
-                    : 'Recent Payments & Official Receipts'}
-                </h2>
-                <button
-                  onClick={() => setActiveTab('COLLECTION')}
-                  className="text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-                >
-                  {isBn ? 'সকল পেমেন্ট দেখুন →' : 'View All / Collect →'}
-                </button>
-              </div>
-
-              {db.payments.length === 0 ? (
-                <div className="text-xs text-slate-500 py-6 text-center">
-                  {isBn
-                    ? 'এখনো কোনো পেমেন্ট রেকর্ড করা হয়নি।'
-                    : 'No payments recorded yet.'}
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2.5 pr-3">
-                          {isBn ? 'রসিদ নং' : 'Receipt #'}
-                        </th>
-                        <th className="py-2.5 px-3">
-                          {isBn ? 'তারিখ' : 'Date'}
-                        </th>
-                        <th className="py-2.5 px-3">
-                          {isBn ? 'ভাড়াটিয়া ও ফ্ল্যাট' : 'Tenant & Unit'}
-                        </th>
-                        <th className="py-2.5 px-3">
-                          {isBn ? 'মাধ্যম' : 'Method'}
-                        </th>
-                        <th className="py-2.5 px-3 text-right">
-                          {isBn ? 'পরিমাণ' : 'Amount'}
-                        </th>
-                        <th className="py-2.5 pl-3 text-right">
-                          {isBn ? 'রসিদ' : 'Action'}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {db.payments.slice(0, 6).map((p) => {
-                        const t = db.tenants.find((x) => x.id === p.tenantId);
-                        const b = db.buildings.find(
-                          (x) => x.id === p.buildingId
-                        );
-                        const u = db.units.find((x) => x.id === p.unitId);
-                        return (
-                          <tr key={p.id} className="hover:bg-slate-50">
-                            <td className="py-3 pr-3 font-mono font-semibold text-slate-900">
-                              {p.receiptNumber}
-                              {p.isReversed ? ' (REVERSED)' : ''}
-                            </td>
-                            <td className="py-3 px-3 font-mono text-slate-600">
-                              {p.paymentDate}
-                            </td>
-                            <td className="py-3 px-3 text-slate-800">
-                              {t?.fullName} · {b?.name} ({u?.unitNumber})
-                            </td>
-                            <td className="py-3 px-3 font-mono text-slate-600">
-                              {p.method}
-                            </td>
-                            <td className="py-3 px-3 text-right font-mono tabular-nums font-bold text-emerald-700">
-                              {formatBDT(p.amountReceivedPoisha, lang)}
-                            </td>
-                            <td className="py-3 pl-3 text-right">
-                              {t && b && u && (
-                                <button
-                                  onClick={() =>
-                                    setReceiptModalCtx({
-                                      payment: p,
-                                      tenant: t,
-                                      building: b,
-                                      unit: u,
-                                      settings: db.settings,
-                                      lang,
-                                    })
-                                  }
-                                  className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold inline-flex items-center gap-1"
-                                >
-                                  <Receipt className="w-3.5 h-3.5" />
-                                  <span>{isBn ? 'রসিদ' : 'Receipt'}</span>
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ==================== 2. BUILDINGS, FLOORS & UNITS ==================== */}
+        {/* ==================== 2. BUILDINGS, FLOORS & UNITS (VISUAL CARDS + MODAL FORMS) ==================== */}
         {activeTab === 'BUILDINGS' && (
           <div className="space-y-6">
-            <div className="border-b border-slate-200 pb-4">
-              <h1 className="text-xl font-bold text-slate-900">
-                {isBn
-                  ? 'ভবন, তলা এবং ফ্ল্যাট ব্যবস্থাপনা'
-                  : 'Buildings, Floors & Rental Units Hierarchy'}
-              </h1>
-              <p className="text-xs text-slate-500 mt-1">
-                {isBn
-                  ? 'একাধিক ভবন, তলা এবং ফ্ল্যাট (ভাড়া, সার্ভিস চার্জ ও বর্তমান অবস্থা) পরিচালনা করুন।'
-                  : 'Manage unlimited buildings, floors, and rental flats with default monthly rent and service charges.'}
-              </p>
+            {/* Clean Section Header with Action Buttons */}
+            <div className="rounded-3xl bg-white border border-slate-200/90 p-6 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+                  {isBn
+                    ? 'ভবন ও ফ্ল্যাট ব্যবস্থাপনা'
+                    : 'Buildings & Flats Overview'}
+                </h1>
+                <p className="text-sm text-slate-500 mt-1">
+                  {isBn
+                    ? 'কোন ফ্ল্যাটে কে আছেন এবং কোন ফ্ল্যাট খালি আছে তা এক নজরে দেখুন।'
+                    : 'See occupied and vacant flats at a glance. Click any button to add a flat or building.'}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  onClick={() => setActiveBldModal('UNIT')}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-xs flex items-center gap-2 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{isBn ? 'নতুন ফ্ল্যাট যোগ করুন' : 'Add Flat'}</span>
+                </button>
+                <button
+                  onClick={() => setActiveBldModal('FLOOR')}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-slate-600" />
+                  <span>{isBn ? 'নতুন তলা' : 'Add Floor'}</span>
+                </button>
+                <button
+                  onClick={() => setActiveBldModal('BUILDING')}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Building2 className="w-4 h-4" />
+                  <span>{isBn ? 'নতুন ভবন' : 'Add Building'}</span>
+                </button>
+              </div>
             </div>
 
-            {/* Forms Grid: Add Building, Floor, Unit */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* 1. Add Building */}
-              <form
-                onSubmit={handleAddBuilding}
-                className="rounded-xl bg-white border border-slate-200 p-5 space-y-3"
-              >
-                <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-emerald-600" />
-                  <span>{isBn ? '১. নতুন ভবন যোগ করুন' : '1. Add New Building'}</span>
-                </h2>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    {isBn ? 'ভবনের নাম *' : 'Building Name *'}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Green View Villa"
-                    value={newBldName}
-                    onChange={(e) => setNewBldName(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    {isBn ? 'ঠিকানা *' : 'Full Address *'}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="House 12, Road 5, Mirpur-10, Dhaka"
-                    value={newBldAddress}
-                    onChange={(e) => setNewBldAddress(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'ডিফল্ট পরিশোধের দিন' : 'Default Due Day'}
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={28}
-                      value={newBldDueDay}
-                      onChange={(e) => setNewBldDueDay(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'মন্তব্য' : 'Notes'}
-                    </label>
-                    <input
-                      type="text"
-                      value={newBldNotes}
-                      onChange={(e) => setNewBldNotes(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  className="w-full py-2 px-4 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
-                >
-                  {isBn ? 'ভবন সংরক্ষণ করুন' : 'Create Building'}
-                </button>
-              </form>
-
-              {/* 2. Add Floor */}
-              <form
-                onSubmit={handleAddFloor}
-                className="rounded-xl bg-white border border-slate-200 p-5 space-y-3"
-              >
-                <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-emerald-600" />
-                  <span>{isBn ? '২. তলা (Floor) যোগ করুন' : '2. Add Floor to Building'}</span>
-                </h2>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    {isBn ? 'ভবন নির্বাচন করুন *' : 'Select Building *'}
-                  </label>
-                  <select
-                    value={newFloorBldId}
-                    onChange={(e) => setNewFloorBldId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
-                  >
-                    {db.buildings.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    {isBn ? 'তলার নাম বা নম্বর *' : 'Floor Name or Number *'}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. 3rd Floor (৪র্থ তলা)"
-                    value={newFloorName}
-                    onChange={(e) => setNewFloorName(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full py-2 px-4 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
-                >
-                  {isBn ? 'তলা যুক্ত করুন' : 'Add Floor'}
-                </button>
-              </form>
-
-              {/* 3. Add Rental Unit */}
-              <form
-                onSubmit={handleAddUnit}
-                className="rounded-xl bg-white border border-slate-200 p-5 space-y-3"
-              >
-                <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <KeyRound className="w-4 h-4 text-emerald-600" />
-                  <span>{isBn ? '৩. নতুন ফ্ল্যাট/ইউনিট যোগ করুন' : '3. Add Rental Unit / Flat'}</span>
-                </h2>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'ভবন *' : 'Building *'}
-                    </label>
-                    <select
-                      value={newUnitBldId}
-                      onChange={(e) => setNewUnitBldId(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-xs"
+            {/* Collapsible / Modal Form when User Clicks Add Flat / Floor / Building */}
+            {activeBldModal !== 'NONE' && (
+              <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h2 className="text-lg font-bold text-slate-900">
+                      {activeBldModal === 'BUILDING' &&
+                        (isBn ? 'নতুন ভবন যোগ করুন' : 'Add New Building')}
+                      {activeBldModal === 'FLOOR' &&
+                        (isBn ? 'ভবনে নতুন তলা যোগ করুন' : 'Add Floor to Building')}
+                      {activeBldModal === 'UNIT' &&
+                        (isBn ? 'নতুন ফ্ল্যাট / ইউনিট যোগ করুন' : 'Add New Rental Flat')}
+                    </h2>
+                    <button
+                      onClick={() => setActiveBldModal('NONE')}
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
                     >
-                      {db.buildings.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'তলা' : 'Floor'}
-                    </label>
-                    <select
-                      value={newUnitFloorId}
-                      onChange={(e) => setNewUnitFloorId(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-xs"
-                    >
-                      {db.floors
-                        .filter((f) => f.buildingId === newUnitBldId)
-                        .map((f) => (
-                          <option key={f.id} value={f.id}>
-                            {f.nameOrNumber}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'ফ্ল্যাট নম্বর *' : 'Flat / Unit Number *'}
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Flat 3A"
-                      value={newUnitNum}
-                      onChange={(e) => setNewUnitNum(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'বেডরুম সংখ্যা' : 'Bedrooms'}
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={10}
-                      value={newUnitBeds}
-                      onChange={(e) => setNewUnitBeds(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'মাসিক ভাড়া (৳) *' : 'Default Rent (BDT) *'}
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      value={newUnitRentTaka}
-                      onChange={(e) => setNewUnitRentTaka(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'সার্ভিস চার্জ (৳)' : 'Service Charge (BDT)'}
-                    </label>
-                    <input
-                      type="number"
-                      value={newUnitScTaka}
-                      onChange={(e) => setNewUnitScTaka(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono"
-                    />
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  className="w-full py-2 px-4 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
-                >
-                  {isBn ? 'ফ্ল্যাট সংরক্ষণ করুন' : 'Create Rental Unit'}
-                </button>
-              </form>
-            </div>
 
-            {/* Building & Units List */}
+                  {activeBldModal === 'BUILDING' && (
+                    <form onSubmit={handleAddBuilding} className="space-y-4 text-sm">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1.5">
+                          {isBn ? 'ভবনের নাম *' : 'Building Name *'}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder={isBn ? 'যেমন: গ্রীন ভিউ ভিলা' : 'e.g. Green View Villa'}
+                          value={newBldName}
+                          onChange={(e) => setNewBldName(e.target.value)}
+                          className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1.5">
+                          {isBn ? 'ভবনের ঠিকানা *' : 'Full Address *'}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="House 12, Road 5, Mirpur-10, Dhaka"
+                          value={newBldAddress}
+                          onChange={(e) => setNewBldAddress(e.target.value)}
+                          className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1.5">
+                            {isBn ? 'ভাড়া পরিশোধের তারিখ' : 'Default Due Day'}
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={28}
+                            value={newBldDueDay}
+                            onChange={(e) => setNewBldDueDay(e.target.value)}
+                            className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1.5">
+                            {isBn ? 'মন্তব্য (ঐচ্ছিক)' : 'Notes'}
+                          </label>
+                          <input
+                            type="text"
+                            value={newBldNotes}
+                            onChange={(e) => setNewBldNotes(e.target.value)}
+                            className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setActiveBldModal('NONE')}
+                          className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-semibold text-sm cursor-pointer"
+                        >
+                          {isBn ? 'বাতিল' : 'Cancel'}
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm cursor-pointer"
+                        >
+                          {isBn ? 'ভবন সংরক্ষণ করুন' : 'Save Building'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {activeBldModal === 'FLOOR' && (
+                    <form onSubmit={handleAddFloor} className="space-y-4 text-sm">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1.5">
+                          {isBn ? 'ভবন নির্বাচন করুন *' : 'Select Building *'}
+                        </label>
+                        <select
+                          value={newFloorBldId}
+                          onChange={(e) => setNewFloorBldId(e.target.value)}
+                          className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm"
+                        >
+                          {db.buildings.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1.5">
+                          {isBn ? 'তলার নাম বা নম্বর *' : 'Floor Name or Number *'}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. 3rd Floor (৪র্থ তলা)"
+                          value={newFloorName}
+                          onChange={(e) => setNewFloorName(e.target.value)}
+                          className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setActiveBldModal('NONE')}
+                          className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-semibold text-sm cursor-pointer"
+                        >
+                          {isBn ? 'বাতিল' : 'Cancel'}
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm cursor-pointer"
+                        >
+                          {isBn ? 'তলা যুক্ত করুন' : 'Save Floor'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {activeBldModal === 'UNIT' && (
+                    <form onSubmit={handleAddUnit} className="space-y-4 text-sm">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1.5">
+                            {isBn ? 'ভবন *' : 'Building *'}
+                          </label>
+                          <select
+                            value={newUnitBldId}
+                            onChange={(e) => setNewUnitBldId(e.target.value)}
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm"
+                          >
+                            {db.buildings.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1.5">
+                            {isBn ? 'তলা' : 'Floor'}
+                          </label>
+                          <select
+                            value={newUnitFloorId}
+                            onChange={(e) => setNewUnitFloorId(e.target.value)}
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm"
+                          >
+                            {db.floors
+                              .filter((f) => f.buildingId === newUnitBldId)
+                              .map((f) => (
+                                <option key={f.id} value={f.id}>
+                                  {f.nameOrNumber}
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1.5">
+                            {isBn ? 'ফ্ল্যাট নম্বর *' : 'Flat Number *'}
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Flat 3A"
+                            value={newUnitNum}
+                            onChange={(e) => setNewUnitNum(e.target.value)}
+                            className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1.5">
+                            {isBn ? 'বেডরুম সংখ্যা' : 'Bedrooms'}
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={10}
+                            value={newUnitBeds}
+                            onChange={(e) => setNewUnitBeds(e.target.value)}
+                            className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1.5">
+                            {isBn ? 'মাসিক ভাড়া (৳) *' : 'Monthly Rent (BDT) *'}
+                          </label>
+                          <input
+                            type="number"
+                            required
+                            value={newUnitRentTaka}
+                            onChange={(e) => setNewUnitRentTaka(e.target.value)}
+                            className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-mono font-bold"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-slate-700 mb-1.5">
+                            {isBn ? 'সার্ভিস চার্জ (৳)' : 'Service Charge (BDT)'}
+                          </label>
+                          <input
+                            type="number"
+                            value={newUnitScTaka}
+                            onChange={(e) => setNewUnitScTaka(e.target.value)}
+                            className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setActiveBldModal('NONE')}
+                          className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-semibold text-sm cursor-pointer"
+                        >
+                          {isBn ? 'বাতিল' : 'Cancel'}
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm cursor-pointer"
+                        >
+                          {isBn ? 'ফ্ল্যাট সংরক্ষণ করুন' : 'Save Flat'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Visual Building & Flat Cards (Easy to Read & Operate) */}
             {db.buildings.map((b) => {
               const bUnits = db.units.filter((u) => u.buildingId === b.id);
+              const occCount = bUnits.filter(
+                (u) => u.status === 'OCCUPIED'
+              ).length;
               return (
                 <div
                   key={b.id}
-                  className="rounded-xl bg-white border border-slate-200 p-5 space-y-4"
+                  className="rounded-3xl bg-white border border-slate-200/90 p-6 shadow-2xs space-y-5"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                     <div>
-                      <h3 className="text-base font-bold text-slate-900">
-                        {b.name}
-                      </h3>
-                      <p className="text-xs text-slate-500">
+                      <div className="flex items-center gap-2.5">
+                        <h3 className="text-lg font-bold text-slate-900">
+                          {b.name}
+                        </h3>
+                        <span className="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold">
+                          {isBn
+                            ? `${toBengaliDigits(occCount)}/${toBengaliDigits(bUnits.length)} ভাড়া দেওয়া`
+                            : `${occCount}/${bUnits.length} Occupied`}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-500 mt-1">
                         {b.address} ·{' '}
                         {isBn
                           ? `ভাড়া পরিশোধের তারিখ: প্রতি মাসের ${toBengaliDigits(b.defaultDueDay)} তারিখ`
-                          : `Default Due Date: Day ${b.defaultDueDay} of month`}
+                          : `Due Date: Day ${b.defaultDueDay} of month`}
                       </p>
                     </div>
-                    <div className="text-xs text-slate-500 font-mono">
-                      {bUnits.length} {isBn ? 'টি ফ্ল্যাট' : 'Units'}
-                    </div>
+
+                    <button
+                      onClick={() => {
+                        setNewUnitBldId(b.id);
+                        setActiveBldModal('UNIT');
+                      }}
+                      className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-bold self-start sm:self-auto flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4 text-emerald-600" />
+                      <span>{isBn ? 'এই ভবনে ফ্ল্যাট যোগ' : 'Add Flat Here'}</span>
+                    </button>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-slate-500">
-                          <th className="py-2 pr-3">{isBn ? 'ফ্ল্যাট' : 'Unit'}</th>
-                          <th className="py-2 px-3">{isBn ? 'ধরন' : 'Type'}</th>
-                          <th className="py-2 px-3 text-right">
-                            {isBn ? 'নির্ধারিত ভাড়া' : 'Default Rent'}
-                          </th>
-                          <th className="py-2 px-3 text-right">
-                            {isBn ? 'সার্ভিস চার্জ' : 'Service Charge'}
-                          </th>
-                          <th className="py-2 px-3">
-                            {isBn ? 'বর্তমান ভাড়াটিয়া' : 'Current Tenant'}
-                          </th>
-                          <th className="py-2 pl-3 text-right">
-                            {isBn ? 'অবস্থা (Status)' : 'Unit Status'}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {bUnits.map((u) => {
-                          const occTenant = db.tenants.find(
-                            (t) =>
-                              t.currentUnitId === u.id && t.status === 'ACTIVE'
-                          );
-                          return (
-                            <tr key={u.id} className="hover:bg-slate-50">
-                              <td className="py-3 pr-3 font-bold text-slate-900">
-                                {u.unitNumber}
-                              </td>
-                              <td className="py-3 px-3 text-slate-600">
-                                {u.unitType} ({u.bedrooms} Bed)
-                              </td>
-                              <td className="py-3 px-3 text-right font-mono tabular-nums">
-                                {formatBDT(u.defaultRentPoisha, lang)}
-                              </td>
-                              <td className="py-3 px-3 text-right font-mono tabular-nums">
-                                {formatBDT(u.serviceChargePoisha, lang)}
-                              </td>
-                              <td className="py-3 px-3 text-slate-800">
-                                {occTenant ? (
-                                  <span className="font-medium">
-                                    {occTenant.fullName} ({occTenant.primaryPhone})
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-400">
-                                    {isBn ? 'খালি' : 'Unoccupied'}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-3 pl-3 text-right">
-                                <select
-                                  value={u.status}
-                                  onChange={(e) =>
-                                    commitDb((d) => {
-                                      const du = d.units.find(
-                                        (x) => x.id === u.id
-                                      );
-                                      if (du)
-                                        du.status = e.target
-                                          .value as UnitStatus;
-                                      return d;
-                                    })
-                                  }
-                                  className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-800"
-                                >
-                                  <option value="OCCUPIED">OCCUPIED</option>
-                                  <option value="VACANT">VACANT</option>
-                                  <option value="MAINTENANCE">
-                                    MAINTENANCE
-                                  </option>
-                                  <option value="UNAVAILABLE">
-                                    UNAVAILABLE
-                                  </option>
-                                </select>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  {/* Grid of Visual Flat Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {bUnits.map((u) => {
+                      const occTenant = db.tenants.find(
+                        (t) =>
+                          t.currentUnitId === u.id && t.status === 'ACTIVE'
+                      );
+                      const isOccupied = u.status === 'OCCUPIED' && !!occTenant;
+
+                      return (
+                        <div
+                          key={u.id}
+                          className={`rounded-2xl p-5 border transition-all flex flex-col justify-between gap-4 ${
+                            isOccupied
+                              ? 'bg-white border-emerald-200/90 shadow-2xs'
+                              : 'bg-amber-50/40 border-amber-200/90'
+                          }`}
+                        >
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="text-lg font-bold text-slate-900">
+                                  {u.unitNumber}
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                  {u.unitType} · {u.bedrooms}{' '}
+                                  {isBn ? 'বেডরুম' : 'Bed'}
+                                </div>
+                              </div>
+
+                              <select
+                                aria-label="Unit Status"
+                                value={u.status}
+                                onChange={(e) =>
+                                  commitDb((d) => {
+                                    const du = d.units.find(
+                                      (x) => x.id === u.id
+                                    );
+                                    if (du)
+                                      du.status = e.target.value as UnitStatus;
+                                    return d;
+                                  })
+                                }
+                                className={`rounded-xl px-2.5 py-1 text-xs font-bold border ${
+                                  u.status === 'OCCUPIED'
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-amber-100/80 text-amber-900 border-amber-300'
+                                }`}
+                              >
+                                <option value="OCCUPIED">
+                                  {isBn ? 'ভাড়া দেওয়া' : 'Occupied'}
+                                </option>
+                                <option value="VACANT">
+                                  {isBn ? 'খালি আছে' : 'Vacant'}
+                                </option>
+                                <option value="MAINTENANCE">
+                                  {isBn ? 'মেরামত চলছে' : 'Maintenance'}
+                                </option>
+                              </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-sm">
+                              <div>
+                                <div className="text-xs text-slate-500">
+                                  {isBn ? 'নির্ধারিত ভাড়া' : 'Monthly Rent'}
+                                </div>
+                                <div className="font-bold font-mono text-slate-900">
+                                  {formatBDT(u.defaultRentPoisha, lang)}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-slate-500">
+                                  {isBn ? 'সার্ভিস চার্জ' : 'Service Charge'}
+                                </div>
+                                <div className="font-bold font-mono text-slate-700">
+                                  {formatBDT(u.serviceChargePoisha, lang)}
+                                </div>
+                              </div>
+                            </div>
+
+                            {occTenant ? (
+                              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                                <div className="text-xs text-slate-500">
+                                  {isBn ? 'বর্তমান ভাড়াটিয়া' : 'Current Tenant'}
+                                </div>
+                                <div className="text-sm font-bold text-slate-900 mt-0.5">
+                                  {occTenant.fullName}
+                                </div>
+                                <div className="text-xs font-mono text-slate-600">
+                                  {occTenant.primaryPhone}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="p-3 rounded-xl bg-white/80 border border-amber-200/70 text-xs text-amber-900 font-medium">
+                                {isBn
+                                  ? 'এই ফ্ল্যাটে বর্তমানে কোনো ভাড়াটিয়া নেই।'
+                                  : 'No active tenant assigned to this flat.'}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-1">
+                            {occTenant ? (
+                              <button
+                                onClick={() => {
+                                  setColTenantId(occTenant.id);
+                                  setActiveTab('COLLECTION');
+                                }}
+                                className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <CreditCard className="w-4 h-4" />
+                                <span>
+                                  {isBn ? 'ভাড়া আদায় করুন' : 'Collect Rent'}
+                                </span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setTBuildingId(b.id);
+                                  setTUnitId(u.id);
+                                  setTRentTaka(
+                                    String(u.defaultRentPoisha / 100)
+                                  );
+                                  setShowAddTenantForm(true);
+                                  setActiveTab('TENANTS');
+                                }}
+                                className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <UserPlus className="w-4 h-4" />
+                                <span>
+                                  {isBn
+                                    ? '+ ভাড়াটিয়া যুক্ত করুন'
+                                    : '+ Assign Tenant'}
+                                </span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -2638,66 +2792,78 @@ export function App() {
           </div>
         )}
 
-        {/* ==================== 3. TENANTS & SECURITY DEPOSITS ==================== */}
+        {/* ==================== 3. TENANTS & SECURITY DEPOSITS (CLEAN CARDS + MODAL) ==================== */}
         {activeTab === 'TENANTS' && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+            {/* Header Banner */}
+            <div className="rounded-3xl bg-white border border-slate-200/90 p-6 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="text-xl font-bold text-slate-900">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                   {isBn
-                    ? 'ভাড়াটিয়া প্রোফাইল, এনআইডি ও জামানত লেজার'
-                    : 'Tenant Profiles, Private Documents & Security Deposit Ledger'}
+                    ? 'ভাড়াটিয়া তালিকা ও জামানত হিসাব'
+                    : 'Tenants & Security Deposits'}
                 </h1>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-sm text-slate-500 mt-1">
                   {isBn
-                    ? 'ভাড়াটিয়ার ছবি ও এনআইডি সংবেদনশীল তথ্য হিসেবে সুরক্ষিত থাকে এবং কখনোই রসিদে প্রকাশ পায় না।'
-                    : 'NID numbers, photographs, and signed agreements are stored privately and never exposed on receipts or shared messages.'}
+                    ? 'ভাড়াটিয়ার মোবাইল নম্বর, মাসিক ভাড়া, বকেয়া এবং জামানত এক নজরে দেখুন।'
+                    : 'Manage tenant profiles, security deposits, and monthly rent easily.'}
                 </p>
               </div>
               <button
                 onClick={() => setShowAddTenantForm((s) => !s)}
-                className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                className="px-5 py-3 text-sm font-bold text-white bg-emerald-600 rounded-2xl hover:bg-emerald-700 flex items-center gap-2 whitespace-nowrap shrink-0 shadow-xs cursor-pointer"
               >
-                <Plus className="w-4 h-4" />
+                <UserPlus className="w-4 h-4" />
                 <span>
                   {showAddTenantForm
                     ? isBn
                       ? 'ফর্ম বন্ধ করুন'
                       : 'Close Form'
                     : isBn
-                    ? 'নতুন ভাড়াটিয়া নিবন্ধন'
-                    : 'Register New Tenant'}
+                    ? '+ নতুন ভাড়াটিয়া যোগ করুন'
+                    : '+ Add New Tenant'}
                 </span>
               </button>
             </div>
 
-            {/* Add Tenant Form */}
+            {/* Add Tenant Modal / Form */}
             {showAddTenantForm && (
               <form
                 onSubmit={handleRegisterTenant}
-                className="rounded-xl bg-white border border-slate-200 p-6 space-y-4"
+                className="rounded-3xl bg-white border-2 border-emerald-500/30 p-6 shadow-lg space-y-5"
               >
-                <h2 className="text-base font-bold text-slate-900">
-                  {isBn
-                    ? 'নতুন ভাড়াটিয়া নিবন্ধন ফর্ম'
-                    : 'New Tenant Registration & Lease Setup'}
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h2 className="text-lg font-bold text-slate-900">
+                    {isBn
+                      ? 'নতুন ভাড়াটিয়া নিবন্ধন ফর্ম'
+                      : 'Register New Tenant'}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTenantForm(false)}
+                    className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'পূর্ণ নাম *' : 'Full Name *'}
+                    <label className="block font-semibold text-slate-700 mb-1.5">
+                      {isBn ? 'ভাড়াটিয়ার পূর্ণ নাম *' : 'Full Name *'}
                     </label>
                     <input
                       type="text"
                       required
+                      placeholder={isBn ? 'যেমন: মো: কামরুল হাসান' : 'Full Name'}
                       value={tFullName}
                       onChange={(e) => setTFullName(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
                     />
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'প্রধান মোবাইল নম্বর *' : 'Primary Phone *'}
+                    <label className="block font-semibold text-slate-700 mb-1.5">
+                      {isBn ? 'মোবাইল নম্বর *' : 'Mobile Number *'}
                     </label>
                     <input
                       type="text"
@@ -2705,35 +2871,25 @@ export function App() {
                       placeholder="017XXXXXXXX"
                       value={tPhone}
                       onChange={(e) => setTPhone(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'বিকল্প মোবাইল নম্বর' : 'Alternative Phone'}
-                    </label>
-                    <input
-                      type="text"
-                      value={tAltPhone}
-                      onChange={(e) => setTAltPhone(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'জাতীয় পরিচয়পত্র (NID) নম্বর *' : 'NID Number (Private) *'}
+                    <label className="block font-semibold text-slate-700 mb-1.5">
+                      {isBn ? 'জাতীয় পরিচয়পত্র (NID) নম্বর *' : 'NID Number *'}
                     </label>
                     <input
                       type="text"
                       required
+                      placeholder="NID Number"
                       value={tNid}
                       onChange={(e) => setTNid(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'ভবন নির্বাচন *' : 'Building *'}
+                    <label className="block font-semibold text-slate-700 mb-1.5">
+                      {isBn ? 'ভবন নির্বাচন *' : 'Select Building *'}
                     </label>
                     <select
                       value={tBuildingId}
@@ -2744,7 +2900,7 @@ export function App() {
                         );
                         if (firstU) setTUnitId(firstU.id);
                       }}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
                     >
                       {db.buildings.map((b) => (
                         <option key={b.id} value={b.id}>
@@ -2754,15 +2910,17 @@ export function App() {
                     </select>
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'ফ্ল্যাট নির্বাচন *' : 'Rental Unit / Flat *'}
+                    <label className="block font-semibold text-slate-700 mb-1.5">
+                      {isBn ? 'ফ্ল্যাট নির্বাচন *' : 'Select Flat *'}
                     </label>
                     <select
                       value={tUnitId}
                       onChange={(e) => setTUnitId(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
                     >
-                      <option value="">-- Select Unit --</option>
+                      <option value="">
+                        {isBn ? '-- ফ্ল্যাট বেছে নিন --' : '-- Select Flat --'}
+                      </option>
                       {db.units
                         .filter((u) => u.buildingId === tBuildingId)
                         .map((u) => (
@@ -2773,7 +2931,7 @@ export function App() {
                     </select>
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
+                    <label className="block font-semibold text-slate-700 mb-1.5">
                       {isBn ? 'মাসিক ভাড়া (৳) *' : 'Monthly Rent (BDT) *'}
                     </label>
                     <input
@@ -2781,104 +2939,69 @@ export function App() {
                       required
                       value={tRentTaka}
                       onChange={(e) => setTRentTaka(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono font-bold"
                     />
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'ফেরতযোগ্য জামানত (৳) *' : 'Security Deposit (BDT) *'}
+                    <label className="block font-semibold text-slate-700 mb-1.5">
+                      {isBn ? 'জামানত / অ্যাডভান্স (৳) *' : 'Security Deposit (BDT) *'}
                     </label>
                     <input
                       type="number"
                       required
                       value={tDepositTaka}
                       onChange={(e) => setTDepositTaka(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'ওঠার তারিখ (Move-in Date) *' : 'Move-In Date *'}
+                    <label className="block font-semibold text-slate-700 mb-1.5">
+                      {isBn ? 'বাসায় ওঠার তারিখ *' : 'Move-In Date *'}
                     </label>
                     <input
                       type="date"
                       required
                       value={tMoveInDate}
                       onChange={(e) => setTMoveInDate(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'চুক্তির মেয়াদ শেষ' : 'Lease End Date'}
-                    </label>
-                    <input
-                      type="date"
-                      value={tLeaseEnd}
-                      onChange={(e) => setTLeaseEnd(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'ভাড়া পরিশোধের দিন (১-২৮)' : 'Payment Due Day (1-28)'}
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={28}
-                      value={tDueDay}
-                      onChange={(e) => setTDueDay(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
+                    <label className="block font-semibold text-slate-700 mb-1.5">
                       {isBn ? 'পেশা ও কর্মস্থল' : 'Occupation'}
                     </label>
                     <input
                       type="text"
                       value={tOccupation}
                       onChange={(e) => setTOccupation(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
                     />
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
+                    <label className="block font-semibold text-slate-700 mb-1.5">
                       {isBn ? 'স্থায়ী ঠিকানা' : 'Permanent Address'}
                     </label>
                     <input
                       type="text"
                       value={tPermAddress}
                       onChange={(e) => setTPermAddress(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
                     />
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'জরুরি যোগাযোগ' : 'Emergency Contact'}
+                    <label className="block font-semibold text-slate-700 mb-1.5">
+                      {isBn ? 'জরুরি যোগাযোগ নম্বর' : 'Emergency Contact'}
                     </label>
                     <input
                       type="text"
                       value={tEmergency}
                       onChange={(e) => setTEmergency(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
                     />
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'পরিবারের সদস্যদের তথ্য' : 'Family Members Info'}
-                    </label>
-                    <input
-                      type="text"
-                      value={tFamilyInfo}
-                      onChange={(e) => setTFamilyInfo(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'ভাড়াটিয়ার ছবি / এনআইডি সংযুক্তি' : 'Tenant Photo / Agreement File'}
+                    <label className="block font-semibold text-slate-700 mb-1.5">
+                      {isBn ? 'ছবি বা চুক্তিপত্র ফাইল (ঐচ্ছিক)' : 'Photo / Agreement'}
                     </label>
                     <input
                       type="file"
@@ -2892,476 +3015,509 @@ export function App() {
                           setTPhotoDataUrl(String(r.result || ''));
                         r.readAsDataURL(f);
                       }}
-                      className="w-full text-xs text-slate-600"
+                      className="w-full text-xs text-slate-600 pt-1.5"
                     />
                   </div>
                 </div>
-                <div className="flex justify-end gap-3 pt-2">
+
+                <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={() => setShowAddTenantForm(false)}
-                    className="px-4 py-2 text-xs font-medium text-slate-600"
+                    className="px-5 py-2.5 rounded-xl bg-slate-100 text-sm font-semibold text-slate-700 cursor-pointer"
                   >
                     {isBn ? 'বাতিল' : 'Cancel'}
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700"
+                    className="px-6 py-2.5 text-sm font-bold text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 cursor-pointer"
                   >
-                    {isBn ? 'ভাড়াটিয়া নিবন্ধন সম্পন্ন করুন' : 'Save & Register Tenant'}
+                    {isBn ? 'ভাড়াটিয়া সংরক্ষণ করুন' : 'Save Tenant'}
                   </button>
                 </div>
               </form>
             )}
 
-            {/* Search & Status Filter */}
+            {/* Deposit & Rent Adjustment Modal (Opens only when requested on a Tenant Card) */}
+            {showDepositModal && (
+              <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+                <div className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h2 className="text-lg font-bold text-slate-900">
+                      {isBn
+                        ? 'জামানত ও মাসিক ভাড়া পরিবর্তন'
+                        : 'Manage Deposit & Monthly Rent'}
+                    </h2>
+                    <button
+                      onClick={() => setShowDepositModal(false)}
+                      className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Part 1: Modify Monthly Rent */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                    <h3 className="text-sm font-bold text-slate-900">
+                      {isBn
+                        ? '১. মাসিক ভাড়া পরিবর্তন করুন'
+                        : '1. Change Monthly Rent'}
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        placeholder={isBn ? 'নতুন ভাড়া (৳)' : 'New Rent (BDT)'}
+                        value={newMonthlyRentTaka}
+                        onChange={(e) => setNewMonthlyRentTaka(e.target.value)}
+                        className="flex-1 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-mono font-bold"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleUpdateTenantFutureRent(selectedTenantForDeposit)
+                        }
+                        className="px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 cursor-pointer"
+                      >
+                        {isBn ? 'ভাড়া আপডেট' : 'Update Rent'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Part 2: Security Deposit / Advance Ledger */}
+                  <form
+                    onSubmit={handleDepositTransaction}
+                    className="space-y-4 text-sm pt-2 border-t border-slate-100"
+                  >
+                    <h3 className="text-sm font-bold text-slate-900">
+                      {isBn
+                        ? '২. জামানত গ্রহণ, কর্তন বা ফেরত'
+                        : '2. Security Deposit Transaction'}
+                    </h3>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        {isBn ? 'ভাড়াটিয়া' : 'Tenant'}
+                      </label>
+                      <select
+                        value={selectedTenantForDeposit}
+                        onChange={(e) =>
+                          setSelectedTenantForDeposit(e.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
+                      >
+                        {db.tenants.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.fullName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        {isBn ? 'লেনদেনের ধরন' : 'Transaction Type'}
+                      </label>
+                      <select
+                        value={depTxType}
+                        onChange={(e) =>
+                          setDepTxType(e.target.value as DepositTxType)
+                        }
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
+                      >
+                        <option value="DEPOSIT_COLLECTED">
+                          {isBn ? 'জামানত জমা নেওয়া' : 'Deposit Received'}
+                        </option>
+                        <option value="DEPOSIT_DEDUCTION">
+                          {isBn ? 'জামানত হতে ক্ষতিপূরণ/বকেয়া কর্তন' : 'Deposit Deduction'}
+                        </option>
+                        <option value="DEPOSIT_REFUND">
+                          {isBn ? 'জামানত ফেরত দেওয়া' : 'Deposit Refund'}
+                        </option>
+                        <option value="ADVANCE_COLLECTED">
+                          {isBn ? 'অগ্রিম ভাড়া জমা' : 'Advance Rent Collected'}
+                        </option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        {isBn ? 'টাকার পরিমাণ (৳) *' : 'Amount (BDT) *'}
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        value={depTxAmountTaka}
+                        onChange={(e) => setDepTxAmountTaka(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        {isBn ? 'কারণ বা নোট *' : 'Reason / Note *'}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder={
+                          isBn
+                            ? 'যেমন: বাসা ছাড়ার সময় রং করার খরচ কর্তন'
+                            : 'e.g. Wall repainting deduction'
+                        }
+                        value={depTxReason}
+                        onChange={(e) => setDepTxReason(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-3 px-4 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 cursor-pointer"
+                    >
+                      {isBn ? 'জামানত হিসাব সংরক্ষণ করুন' : 'Save Deposit Record'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* Search & Filter Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="relative flex-1 min-w-[240px]">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type="text"
                   placeholder={
                     isBn
-                      ? 'নাম, মোবাইল বা ফ্ল্যাট দিয়ে খুঁজুন...'
-                      : 'Search tenants by name, phone, or flat...'
+                      ? 'ভাড়াটিয়ার নাম বা মোবাইল নম্বর দিয়ে খুঁজুন...'
+                      : 'Search tenant by name or phone...'
                   }
                   value={tenantSearch}
                   onChange={(e) => setTenantSearch(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white pl-9 pr-3 py-2 text-xs"
+                  className="w-full rounded-2xl border border-slate-300 bg-white pl-11 pr-4 py-2.5 text-sm shadow-2xs"
                 />
               </div>
 
-              <div className="flex items-center gap-1 p-1 bg-slate-200/70 rounded-lg">
+              <div className="flex items-center gap-1.5 p-1.5 bg-white border border-slate-200 rounded-2xl">
                 {(['ACTIVE', 'ARCHIVED', 'ALL'] as const).map((st) => (
                   <button
                     key={st}
                     onClick={() => setTenantStatusFilter(st)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    className={`px-4 py-2 text-xs sm:text-sm font-bold rounded-xl transition-colors cursor-pointer ${
                       tenantStatusFilter === st
-                        ? 'bg-white text-slate-900 shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:bg-slate-100'
                     }`}
                   >
                     {st === 'ACTIVE'
                       ? isBn
-                        ? 'সক্রিয় (Active)'
+                        ? 'বর্তমান ভাড়াটিয়া'
                         : 'Active'
                       : st === 'ARCHIVED'
                       ? isBn
-                        ? 'আর্কাইভ (Archived)'
+                        ? 'পূর্বের ভাড়াটিয়া'
                         : 'Archived'
                       : isBn
-                      ? 'সকল (All)'
+                      ? 'সকল'
                       : 'All'}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Tenants List + Security Deposit & Rent Adjustment Panel */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <div className="lg:col-span-8 space-y-3">
-                {db.tenants
-                  .filter((t) =>
-                    tenantStatusFilter === 'ALL'
-                      ? true
-                      : t.status === tenantStatusFilter
-                  )
-                  .filter(
-                    (t) =>
-                      !tenantSearch.trim() ||
-                      t.fullName
-                        .toLowerCase()
-                        .includes(tenantSearch.toLowerCase()) ||
-                      t.primaryPhone.includes(tenantSearch)
-                  )
-                  .map((t) => {
-                    const b = db.buildings.find(
-                      (x) => x.id === t.currentBuildingId
-                    );
-                    const u = db.units.find((x) => x.id === t.currentUnitId);
-                    const depSummary = calculateTenantDepositBalance(
-                      t.id,
-                      db.depositTransactions
-                    );
-                    const unpaid = getTenantUnpaidObligations(
-                      t.id,
-                      db.rentCharges,
-                      db.utilityBills
-                    ).reduce((s, o) => s + o.outstandingPoisha, 0);
+            {/* Spacious 2-Column Grid of Friendly Tenant Profile Cards */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {db.tenants
+                .filter((t) =>
+                  tenantStatusFilter === 'ALL'
+                    ? true
+                    : t.status === tenantStatusFilter
+                )
+                .filter(
+                  (t) =>
+                    !tenantSearch.trim() ||
+                    t.fullName
+                      .toLowerCase()
+                      .includes(tenantSearch.toLowerCase()) ||
+                    t.primaryPhone.includes(tenantSearch)
+                )
+                .map((t) => {
+                  const b = db.buildings.find(
+                    (x) => x.id === t.currentBuildingId
+                  );
+                  const u = db.units.find((x) => x.id === t.currentUnitId);
+                  const depSummary = calculateTenantDepositBalance(
+                    t.id,
+                    db.depositTransactions
+                  );
+                  const unpaid = getTenantUnpaidObligations(
+                    t.id,
+                    db.rentCharges,
+                    db.utilityBills
+                  ).reduce((s, o) => s + o.outstandingPoisha, 0);
 
-                    return (
-                      <div
-                        key={t.id}
-                        className="rounded-xl bg-white border border-slate-200 p-5 space-y-3"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                          <div>
-                            <h3 className="text-base font-bold text-slate-900">
-                              {t.fullName}
-                            </h3>
-                            <div className="text-xs text-slate-500 mt-0.5">
-                              <span>{b?.name}</span>
-                              <span aria-hidden="true"> · </span>
-                              <span className="font-semibold text-slate-700">
-                                {u?.unitNumber}
-                              </span>
-                              <span aria-hidden="true"> · </span>
-                              <span className="font-mono">{t.primaryPhone}</span>
-                              <span aria-hidden="true"> · </span>
-                              <span>{t.status}</span>
+                  return (
+                    <div
+                      key={t.id}
+                      className="rounded-3xl bg-white border border-slate-200/90 p-6 shadow-2xs flex flex-col justify-between gap-4"
+                    >
+                      <div className="space-y-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3.5">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-800 font-bold text-lg flex items-center justify-center shrink-0">
+                              {t.fullName.slice(0, 1).toUpperCase()}
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-bold text-slate-900">
+                                {t.fullName}
+                              </h3>
+                              <div className="text-sm text-slate-600 mt-0.5 flex flex-wrap items-center gap-1.5">
+                                <span className="font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-lg">
+                                  {u?.unitNumber}
+                                </span>
+                                <span>·</span>
+                                <span>{b?.name}</span>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="text-left sm:text-right font-mono text-xs">
-                            <div className="font-bold text-slate-900">
-                              {isBn ? 'মাসিক ভাড়া:' : 'Monthly Rent:'}{' '}
+                          <span
+                            className={`px-3 py-1 rounded-xl text-xs font-bold ${
+                              t.status === 'ACTIVE'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            {t.status === 'ACTIVE'
+                              ? isBn
+                                ? 'সক্রিয়'
+                                : 'Active'
+                              : isBn
+                              ? 'আর্কাইভ'
+                              : 'Archived'}
+                          </span>
+                        </div>
+
+                        {/* Phone & Move-in Info */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600 bg-slate-50 px-4 py-2.5 rounded-2xl">
+                          <span className="font-mono font-semibold text-slate-800">
+                            📞 {t.primaryPhone}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            {isBn ? 'ওঠার তারিখ:' : 'Move-In:'} {t.moveInDate}
+                          </span>
+                        </div>
+
+                        {/* 3 Clear Financial Boxes */}
+                        <div className="grid grid-cols-3 gap-2.5 text-center">
+                          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70">
+                            <div className="text-xs text-slate-500">
+                              {isBn ? 'মাসিক ভাড়া' : 'Monthly Rent'}
+                            </div>
+                            <div className="text-sm sm:text-base font-bold font-mono text-slate-900 mt-1">
                               {formatBDT(t.monthlyRentPoisha, lang)}
                             </div>
+                          </div>
+
+                          <div
+                            className={`p-3 rounded-2xl border ${
+                              unpaid > 0
+                                ? 'bg-rose-50/70 border-rose-200'
+                                : 'bg-emerald-50/70 border-emerald-200'
+                            }`}
+                          >
+                            <div className="text-xs text-slate-600">
+                              {isBn ? 'বর্তমান বকেয়া' : 'Unpaid Due'}
+                            </div>
                             <div
-                              className={
+                              className={`text-sm sm:text-base font-bold font-mono mt-1 ${
                                 unpaid > 0
-                                  ? 'text-red-600 font-semibold'
+                                  ? 'text-rose-600'
                                   : 'text-emerald-700'
-                              }
+                              }`}
                             >
-                              {isBn ? 'বর্তমান বকেয়া:' : 'Unpaid Due:'}{' '}
                               {formatBDT(unpaid, lang)}
                             </div>
                           </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-100 text-xs">
-                          <div>
-                            <span className="text-slate-400 block">
-                              {isBn ? 'গচ্ছিত জামানত (Held Deposit)' : 'Held Security Deposit'}
-                            </span>
-                            <span className="font-mono font-semibold text-slate-800">
-                              {formatBDT(depSummary.heldBalancePoisha, lang)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block">
-                              {isBn ? 'অগ্রিম জমা (Advance Credit)' : 'Advance Rent Credit'}
-                            </span>
-                            <span className="font-mono font-semibold text-emerald-700">
-                              {formatBDT(t.advanceRentCreditPoisha, lang)}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block">
-                              {isBn ? 'এনআইডি (গোপনীয়)' : 'NID (Private Record)'}
-                            </span>
-                            <span className="font-mono text-slate-700">
-                              {hasPerm('manageDocuments')
-                                ? t.nidNumber
-                                : '••••••••••••'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-slate-400 block">
-                              {isBn ? 'চুক্তিপত্র ও ওঠার তারিখ' : 'Move-In & Agreement'}
-                            </span>
-                            <span className="font-mono text-slate-700">
-                              {t.moveInDate}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-                          <button
-                            onClick={() => {
-                              setSelectedTenantForDeposit(t.id);
-                              setNewMonthlyRentTaka(
-                                String(t.monthlyRentPoisha / 100)
-                              );
-                            }}
-                            className="px-3 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold"
-                          >
-                            {isBn
-                              ? 'জামানত ও ভাড়া পরিবর্তন'
-                              : 'Manage Deposit / Adjust Rent'}
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setColTenantId(t.id);
-                              setActiveTab('COLLECTION');
-                            }}
-                            className="px-3 py-1.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold hover:bg-emerald-100"
-                          >
-                            {isBn ? 'ভাড়া আদায়' : 'Collect Rent'}
-                          </button>
-
-                          {t.status === 'ACTIVE' ? (
-                            <button
-                              onClick={() =>
-                                handleArchiveOrRestoreTenant(t.id, true)
-                              }
-                              className="px-3 py-1.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold hover:bg-amber-100 flex items-center gap-1 ml-auto"
-                            >
-                              <Archive className="w-3.5 h-3.5" />
-                              <span>
-                                {isBn ? 'আর্কাইভ (Move-Out)' : 'Archive (Move-Out)'}
-                              </span>
-                            </button>
-                          ) : (
-                            <div className="flex items-center gap-2 ml-auto">
-                              <button
-                                onClick={() =>
-                                  handleArchiveOrRestoreTenant(t.id, false)
-                                }
-                                className="px-3 py-1.5 rounded bg-slate-100 text-slate-800 text-xs font-semibold"
-                              >
-                                {isBn ? 'পুনরায় সক্রিয়' : 'Restore'}
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleDeleteTenantPermanently(t.id)
-                                }
-                                className="px-2.5 py-1.5 rounded bg-red-50 text-red-700 text-xs font-semibold flex items-center gap-1"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>{isBn ? 'মুছুন' : 'Delete'}</span>
-                              </button>
+                          <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70">
+                            <div className="text-xs text-slate-500">
+                              {isBn ? 'গচ্ছিত জামানত' : 'Held Deposit'}
                             </div>
-                          )}
+                            <div className="text-sm sm:text-base font-bold font-mono text-slate-900 mt-1">
+                              {formatBDT(depSummary.heldBalancePoisha, lang)}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    );
-                  })}
-              </div>
 
-              {/* Right Column: Deposit & Future Rent Adjustment Inspector */}
-              <div className="lg:col-span-4 space-y-4">
-                <form
-                  onSubmit={handleDepositTransaction}
-                  className="rounded-xl bg-white border border-slate-200 p-5 space-y-3"
-                >
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {isBn
-                      ? 'জামানত ও অগ্রিম সমন্বয় (Deposit Ledger)'
-                      : 'Security Deposit & Advance Ledger'}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    {isBn
-                      ? 'জামানত গ্রহণ, ক্ষতিপূরণ কর্তন বা ফেরত দেওয়ার জন্য কারণসহ অডিট এন্ট্রি করুন।'
-                      : 'Record deposit collection, damage deduction, or move-out refund with mandatory audit reason.'}
-                  </p>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'ভাড়াটিয়া' : 'Tenant'}
-                    </label>
-                    <select
-                      value={selectedTenantForDeposit}
-                      onChange={(e) =>
-                        setSelectedTenantForDeposit(e.target.value)
-                      }
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
-                    >
-                      {db.tenants.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.fullName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'লেনদেনের ধরন' : 'Transaction Type'}
-                    </label>
-                    <select
-                      value={depTxType}
-                      onChange={(e) =>
-                        setDepTxType(e.target.value as DepositTxType)
-                      }
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
-                    >
-                      <option value="DEPOSIT_COLLECTED">
-                        {isBn ? 'জামানত গ্রহণ (Deposit Received)' : 'Deposit Received'}
-                      </option>
-                      <option value="DEPOSIT_DEDUCTION">
-                        {isBn
-                          ? 'জামানত হতে কর্তন (Damage/Unpaid Deduction)'
-                          : 'Authorized Deposit Deduction'}
-                      </option>
-                      <option value="DEPOSIT_REFUND">
-                        {isBn ? 'জামানত ফেরত (Move-Out Refund)' : 'Deposit Refund to Tenant'}
-                      </option>
-                      <option value="ADVANCE_COLLECTED">
-                        {isBn ? 'অগ্রিম ভাড়া গ্রহণ (Advance Rent)' : 'Advance Rent Collected'}
-                      </option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'পরিমাণ (৳) *' : 'Amount (BDT) *'}
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      value={depTxAmountTaka}
-                      onChange={(e) => setDepTxAmountTaka(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
-                      {isBn ? 'কারণ ও অডিট নোট *' : 'Audit Reason / Note *'}
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Wall repainting deduction on move-out"
-                      value={depTxReason}
-                      onChange={(e) => setDepTxReason(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    className="w-full py-2 px-4 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
-                  >
-                    {isBn ? 'জামানত লেজার আপডেট করুন' : 'Record Deposit Transaction'}
-                  </button>
-                </form>
+                      {/* Clear Action Buttons */}
+                      <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
+                        <button
+                          onClick={() => {
+                            setColTenantId(t.id);
+                            if (unpaid > 0) {
+                              setColAmountTaka(String(unpaid / 100));
+                            }
+                            setActiveTab('COLLECTION');
+                          }}
+                          className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                          <span>{isBn ? 'ভাড়া আদায়' : 'Collect Rent'}</span>
+                        </button>
 
-                {/* Rent Change Box */}
-                <div className="rounded-xl bg-white border border-slate-200 p-5 space-y-3">
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {isBn
-                      ? 'মাসিক ভাড়া পরিবর্তন (Rent Adjustment)'
-                      : 'Modify Tenant Monthly Rent'}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    {isBn
-                      ? 'ভবিষ্যৎ মাসের ভাড়া পরিবর্তন করলেও পূর্ববর্তী মাসের পরিশোধিত হিসাব ও রসিদ অপরিবর্তিত থাকবে।'
-                      : 'Preserves all historical paid charges and applies the updated rent only to unpaid current/future periods.'}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      placeholder="New Rent (BDT)"
-                      value={newMonthlyRentTaka}
-                      onChange={(e) => setNewMonthlyRentTaka(e.target.value)}
-                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleUpdateTenantFutureRent(selectedTenantForDeposit)
-                      }
-                      className="px-3.5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 whitespace-nowrap"
-                    >
-                      {isBn ? 'আপডেট' : 'Update Rent'}
-                    </button>
-                  </div>
-                </div>
-              </div>
+                        <button
+                          onClick={() => {
+                            setSelectedTenantForDeposit(t.id);
+                            setNewMonthlyRentTaka(
+                              String(t.monthlyRentPoisha / 100)
+                            );
+                            setShowDepositModal(true);
+                          }}
+                          className="py-2.5 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-bold cursor-pointer"
+                        >
+                          {isBn ? 'জামানত / ভাড়া পরিবর্তন' : 'Deposit & Rent'}
+                        </button>
+
+                        {t.status === 'ACTIVE' ? (
+                          <button
+                            onClick={() =>
+                              handleArchiveOrRestoreTenant(t.id, true)
+                            }
+                            className="py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold flex items-center gap-1 cursor-pointer"
+                          >
+                            <Archive className="w-3.5 h-3.5" />
+                            <span>{isBn ? 'বাসা ছেড়েছেন' : 'Move Out'}</span>
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() =>
+                                handleArchiveOrRestoreTenant(t.id, false)
+                              }
+                              className="py-2 px-3 rounded-xl bg-slate-100 text-slate-800 text-xs font-bold cursor-pointer"
+                            >
+                              {isBn ? 'সক্রিয় করুন' : 'Restore'}
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleDeleteTenantPermanently(t.id)
+                              }
+                              className="py-2 px-2.5 rounded-xl bg-rose-50 text-rose-700 text-xs font-bold cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}
 
-        {/* ==================== 4. RENT COLLECTION & RECEIPTS ==================== */}
+        {/* ==================== 4. RENT COLLECTION & RECEIPTS (STEP-BY-STEP FRIENDLY FLOW) ==================== */}
         {activeTab === 'COLLECTION' && (
           <div className="space-y-6">
-            <div className="border-b border-slate-200 pb-4">
-              <h1 className="text-xl font-bold text-slate-900">
+            <div className="rounded-3xl bg-white border border-slate-200/90 p-6 shadow-2xs">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
                 {isBn
-                  ? 'ভাড়া ও ইউটিলিটি আদায় এবং রসিদ তৈরি'
-                  : 'Rent Collection, Charge Allocation & Official Receipt Generator'}
+                  ? 'সহজ ভাড়া ও বিল আদায় এবং রসিদ তৈরি'
+                  : 'Rent Collection & Instant Receipt'}
               </h1>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-sm text-slate-500 mt-1">
                 {isBn
-                  ? 'পূর্ণ বা আংশিক পেমেন্ট, একাধিক মাসের বকেয়া বা অতিরিক্ত অগ্রিম পেমেন্ট গ্রহণ করুন এবং সাথে সাথে PDF/PNG রসিদ শেয়ার করুন।'
-                  : 'Support full payments, partial installments, multi-period settlements, oldest-first (FIFO) or custom charge allocation, and instant PDF/Image receipts.'}
+                  ? 'ভাড়াটিয়া নির্বাচন করুন, টাকার পরিমাণ বসান এবং এক ক্লিকে রসিদ ডাউনলোড বা WhatsApp-এ পাঠান।'
+                  : 'Select tenant, enter amount received, and generate an official bilingual receipt immediately.'}
               </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left 6 Cols: Payment Recording Form */}
+              {/* Left 7 Cols: Step-by-Step Collection Form */}
               <form
                 onSubmit={handleRecordPayment}
-                className="lg:col-span-6 rounded-xl bg-white border border-slate-200 p-6 space-y-4"
+                className="lg:col-span-7 rounded-3xl bg-white border border-slate-200/90 p-6 sm:p-7 shadow-2xs space-y-6"
               >
-                <h2 className="text-base font-bold text-slate-900">
-                  {isBn ? 'পেমেন্ট গ্রহণ ও বণ্টন ফর্ম' : 'Record Payment & Allocate'}
-                </h2>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
-                    {isBn ? 'ভাড়াটিয়া ও ফ্ল্যাট নির্বাচন করুন *' : 'Select Tenant & Flat *'}
+                {/* Step 1: Select Tenant */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-slate-800">
+                    {isBn
+                      ? '১. কোন ফ্ল্যাটের ভাড়াটিয়া হতে টাকা নিচ্ছেন? *'
+                      : '1. Select Tenant & Flat *'}
                   </label>
                   <select
                     value={colTenantId}
                     onChange={(e) => setColTenantId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium"
+                    className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 px-4 py-3.5 text-base font-bold text-slate-900"
                   >
                     {db.tenants.map((t) => {
                       const u = db.units.find((x) => x.id === t.currentUnitId);
                       return (
                         <option key={t.id} value={t.id}>
-                          {t.fullName} — {u?.unitNumber} ({t.status})
+                          {u?.unitNumber} — {t.fullName} ({t.primaryPhone})
                         </option>
                       );
                     })}
                   </select>
                 </div>
 
-                {/* Unpaid Obligations List */}
-                <div className="rounded-lg bg-slate-50 border border-slate-200 p-3.5 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-700">
+                {/* Unpaid Obligations Box with 1-Tap Fill */}
+                <div className="rounded-2xl bg-slate-50 border border-slate-200/90 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-slate-800">
                       {isBn
-                        ? 'অপরিশোধিত ভাড়া ও বিলের তালিকা:'
-                        : 'Unpaid Charges & Utility Bills:'}
+                        ? 'এই ভাড়াটিয়ার অপরিশোধিত হিসাব:'
+                        : 'Unpaid Rent & Bills:'}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const sumTaka =
-                          unpaidObligations.reduce(
-                            (s, o) => s + o.outstandingPoisha,
-                            0
-                          ) / 100;
-                        setColAmountTaka(String(sumTaka));
-                      }}
-                      className="text-emerald-700 font-semibold hover:underline"
-                    >
-                      {isBn ? 'সম্পূর্ণ বকেয়া বসান' : 'Fill Full Balance'}
-                    </button>
+                    {unpaidObligations.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sumTaka =
+                            unpaidObligations.reduce(
+                              (s, o) => s + o.outstandingPoisha,
+                              0
+                            ) / 100;
+                          setColAmountTaka(String(sumTaka));
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white text-xs sm:text-sm font-bold hover:bg-emerald-700 cursor-pointer"
+                      >
+                        {isBn
+                          ? 'সম্পূর্ণ বকেয়া টাকা বসান'
+                          : 'Fill Full Due Amount'}
+                      </button>
+                    )}
                   </div>
 
                   {unpaidObligations.length === 0 ? (
-                    <div className="text-xs text-slate-500 py-2">
+                    <div className="text-sm text-emerald-800 bg-emerald-50/80 border border-emerald-200 rounded-xl p-3 font-medium">
                       {isBn
-                        ? 'এই ভাড়াটিয়ার কোনো বকেয়া নেই। অতিরিক্ত পেমেন্ট অগ্রিম (Advance Credit) হিসেবে জমা হবে।'
-                        : 'No unpaid charges. Any payment recorded will be stored as unallocated Advance Rent Credit.'}
+                        ? 'এই ভাড়াটিয়ার কোনো বকেয়া নেই। এখন টাকা জমা নিলে তা অগ্রিম (Advance Credit) হিসেবে জমা থাকবে।'
+                        : 'No unpaid dues! Any payment recorded will be stored as Advance Credit.'}
                     </div>
                   ) : (
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       {unpaidObligations.map((ob) => (
                         <div
                           key={ob.targetId}
-                          className="flex items-center justify-between gap-2 text-xs bg-white px-3 py-2 rounded border border-slate-200"
+                          className="flex items-center justify-between gap-3 bg-white px-4 py-3 rounded-xl border border-slate-200 text-sm"
                         >
                           <div>
-                            <div className="font-semibold text-slate-800">
+                            <div className="font-bold text-slate-900">
                               {ob.label}
                             </div>
-                            <div className="text-[11px] text-slate-500 font-mono">
-                              Total: {formatBDT(ob.totalPoisha, lang)} · Paid:{' '}
+                            <div className="text-xs text-slate-500 font-mono">
+                              {isBn ? 'মোট:' : 'Total:'}{' '}
+                              {formatBDT(ob.totalPoisha, lang)} ·{' '}
+                              {isBn ? 'জমা:' : 'Paid:'}{' '}
                               {formatBDT(ob.paidPoisha, lang)}
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-red-600">
+                            <span className="font-mono font-bold text-base text-rose-600">
                               {formatBDT(ob.outstandingPoisha, lang)}
                             </span>
                             {colMode === 'CUSTOM' && (
                               <input
                                 type="number"
-                                placeholder="Allocate ৳"
+                                placeholder="৳"
                                 value={colCustomMapTaka[ob.targetId] || ''}
                                 onChange={(e) =>
                                   setColCustomMapTaka((prev) => ({
@@ -3369,7 +3525,7 @@ export function App() {
                                     [ob.targetId]: e.target.value,
                                   }))
                                 }
-                                className="w-24 rounded border border-slate-300 px-2 py-1 text-xs font-mono text-right"
+                                className="w-28 rounded-xl border border-slate-300 px-3 py-1.5 text-sm font-mono text-right"
                               />
                             )}
                           </div>
@@ -3379,125 +3535,137 @@ export function App() {
                   )}
                 </div>
 
-                {/* Allocation Rule Selector */}
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-600 font-medium">
-                    {isBn ? 'বণ্টন নিয়ম:' : 'Allocation Rule:'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setColMode('FIFO')}
-                    className={`px-3 py-1.5 rounded-md font-medium ${
-                      colMode === 'FIFO'
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    {isBn ? 'পুরাতন বকেয়া আগে (Oldest First)' : 'Oldest Due First (FIFO)'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setColMode('CUSTOM')}
-                    className={`px-3 py-1.5 rounded-md font-medium ${
-                      colMode === 'CUSTOM'
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    {isBn ? 'পছন্দমতো মাস নির্বাচন (Custom)' : 'Owner-Selected Custom'}
-                  </button>
+                {/* Step 2: Enter Amount Received */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-slate-800">
+                    {isBn
+                      ? '২. কত টাকা জমা নিচ্ছেন (৳)? *'
+                      : '2. Amount Received (BDT) *'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    placeholder={isBn ? 'টাকার পরিমাণ লিখুন (যেমন: ২৪০০০)' : 'Enter amount e.g. 24000'}
+                    value={colAmountTaka}
+                    onChange={(e) => setColAmountTaka(e.target.value)}
+                    className="w-full rounded-2xl border-2 border-emerald-500/60 bg-white px-4 py-3.5 text-xl font-mono font-bold text-slate-900 focus:border-emerald-600 focus:outline-none"
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'প্রাপ্ত টাকার পরিমাণ (৳) *' : 'Amount Received (BDT) *'}
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      placeholder="e.g. 24000"
-                      value={colAmountTaka}
-                      onChange={(e) => setColAmountTaka(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono font-bold"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'পরিশোধের মাধ্যম *' : 'Payment Method (Recording Only) *'}
-                    </label>
-                    <select
-                      value={colMethod}
-                      onChange={(e) =>
-                        setColMethod(e.target.value as PaymentMethod)
-                      }
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium"
-                    >
-                      <option value="CASH">{isBn ? 'নগদ (Cash)' : 'Cash'}</option>
-                      <option value="BKASH">bKash (বিকাশ)</option>
-                      <option value="NAGAD">Nagad (নগদ)</option>
-                      <option value="ROCKET">Rocket (রকেট)</option>
-                      <option value="BANK">
-                        {isBn ? 'ব্যাংক ট্রান্সফার (Bank)' : 'Bank Transfer'}
-                      </option>
-                      <option value="ADVANCE_APPLIED">
-                        {isBn
-                          ? 'অগ্রিম জমা হতে সমন্বয় (Apply Advance Credit)'
-                          : 'Apply Eligible Advance Credit'}
-                      </option>
-                      <option value="OTHER">
-                        {isBn ? 'অন্যান্য (Other)' : 'Other Manual Method'}
-                      </option>
-                    </select>
+                {/* Step 3: Visual Payment Method Selector */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-slate-800">
+                    {isBn
+                      ? '৩. কীভাবে টাকা পেয়েছেন? *'
+                      : '3. Payment Method *'}
+                  </label>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {(
+                      [
+                        ['CASH', isBn ? 'নগদ ক্যাশ' : 'Cash'],
+                        ['BKASH', 'bKash'],
+                        ['NAGAD', 'Nagad'],
+                        ['ROCKET', 'Rocket'],
+                        ['BANK', isBn ? 'ব্যাংক' : 'Bank'],
+                        ['ADVANCE_APPLIED', isBn ? 'অগ্রিম সমন্বয়' : 'Advance'],
+                      ] as [PaymentMethod, string][]
+                    ).map(([mKey, mLabel]) => (
+                      <button
+                        key={mKey}
+                        type="button"
+                        onClick={() => setColMethod(mKey)}
+                        className={`py-2.5 px-2 rounded-xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
+                          colMethod === mKey
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {mLabel}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {/* Optional Reference, Notes & Allocation Mode */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm pt-2 border-t border-slate-100">
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'ট্রানজেকশন রেফারেন্স / TrxID' : 'Transaction Reference / TrxID'}
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      {isBn
+                        ? 'বিকাশ / ব্যাংক ট্রানজেকশন নম্বর (ঐচ্ছিক)'
+                        : 'TrxID / Check Ref (Optional)'}
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. BK981234X or Check #"
+                      placeholder="e.g. BK981234X"
                       value={colRef}
                       onChange={(e) => setColRef(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono"
                     />
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'মন্তব্য' : 'Notes'}
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      {isBn ? 'রসিদে মন্তব্য (ঐচ্ছিক)' : 'Receipt Note (Optional)'}
                     </label>
                     <input
                       type="text"
-                      placeholder="Optional note on receipt"
+                      placeholder={isBn ? 'যেমন: মার্চ মাসের ভাড়া' : 'Optional note'}
                       value={colNotes}
                       onChange={(e) => setColNotes(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
                     />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span>{isBn ? 'বকেয়া সমন্বয়ের নিয়ম:' : 'Allocation Mode:'}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setColMode('FIFO')}
+                      className={`px-3 py-1 rounded-lg font-bold cursor-pointer ${
+                        colMode === 'FIFO'
+                          ? 'bg-slate-800 text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {isBn ? 'স্বয়ংক্রিয় (পুরাতন বকেয়া আগে)' : 'Auto (Oldest First)'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setColMode('CUSTOM')}
+                      className={`px-3 py-1 rounded-lg font-bold cursor-pointer ${
+                        colMode === 'CUSTOM'
+                          ? 'bg-slate-800 text-white'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {isBn ? 'নিজের মতো ভাগ' : 'Custom Split'}
+                    </button>
                   </div>
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors"
+                  className="w-full py-4 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-base font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  {isBn
-                    ? 'পেমেন্ট সংরক্ষণ ও রসিদ তৈরি করুন'
-                    : 'Save Payment & Generate Official Receipt'}
+                  <Receipt className="w-5 h-5" />
+                  <span>
+                    {isBn
+                      ? 'ভাড়া জমা নিন ও রসিদ দেখুন'
+                      : 'Save Payment & View Receipt'}
+                  </span>
                 </button>
               </form>
 
-              {/* Right 6 Cols: Payment Ledger & Receipt History */}
-              <div className="lg:col-span-6 rounded-xl bg-white border border-slate-200 p-6 space-y-4">
-                <h2 className="text-base font-bold text-slate-900">
+              {/* Right 5 Cols: Recent Receipts History */}
+              <div className="lg:col-span-5 rounded-3xl bg-white border border-slate-200/90 p-6 shadow-2xs space-y-4">
+                <h2 className="text-lg font-bold text-slate-900">
                   {isBn
-                    ? 'সকল রসিদ ও পেমেন্ট বণ্টন ইতিহাস'
-                    : 'Recorded Payments & Allocation Breakdown'}
+                    ? 'পূর্ববর্তী আদায় ও রসিদ তালিকা'
+                    : 'Payment & Receipt History'}
                 </h2>
-                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                <div className="space-y-3 max-h-[680px] overflow-y-auto pr-1">
                   {db.payments.map((p) => {
                     const t = db.tenants.find((x) => x.id === p.tenantId);
                     const b = db.buildings.find((x) => x.id === p.buildingId);
@@ -3505,50 +3673,33 @@ export function App() {
                     return (
                       <div
                         key={p.id}
-                        className={`p-4 rounded-xl border ${
+                        className={`p-4 rounded-2xl border ${
                           p.isReversed
-                            ? 'bg-red-50/40 border-red-200 opacity-75'
-                            : 'bg-slate-50 border-slate-200'
-                        } space-y-2 text-xs`}
+                            ? 'bg-rose-50/40 border-rose-200 opacity-75'
+                            : 'bg-slate-50 border-slate-200/90'
+                        } space-y-3 text-sm`}
                       >
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between gap-2">
                           <div>
-                            <span className="font-mono font-bold text-slate-900">
-                              #{p.receiptNumber}
-                            </span>
-                            <span aria-hidden="true"> · </span>
-                            <span className="font-mono text-slate-500">
-                              {p.paymentDate}
-                            </span>
-                            <div className="font-semibold text-slate-800 mt-0.5">
-                              {t?.fullName} ({u?.unitNumber})
+                            <div className="font-bold text-slate-900 text-base">
+                              {t?.fullName}{' '}
+                              <span className="text-slate-500 font-medium text-sm">
+                                ({u?.unitNumber})
+                              </span>
+                            </div>
+                            <div className="font-mono text-xs text-slate-500 mt-0.5">
+                              #{p.receiptNumber} · {p.paymentDate} · {p.method}
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="font-mono font-bold text-sm text-emerald-700">
+                            <div className="font-mono font-bold text-base text-emerald-700">
                               {formatBDT(p.amountReceivedPoisha, lang)}
-                            </div>
-                            <div className="font-mono text-[11px] text-slate-500">
-                              {p.method}{' '}
-                              {p.transactionRef ? `· ${p.transactionRef}` : ''}
                             </div>
                           </div>
                         </div>
 
-                        <div className="text-[11px] text-slate-600 space-y-0.5 pt-1 border-t border-slate-200/70">
-                          {p.allocations.map((a) => (
-                            <div
-                              key={a.id}
-                              className="flex justify-between font-mono"
-                            >
-                              <span>→ {a.label}</span>
-                              <span>{formatBDT(a.amountPoisha, lang)}</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="flex items-center justify-between pt-2">
-                          <span className="text-[11px] text-slate-400">
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-200/70">
+                          <span className="text-xs text-slate-500">
                             {isBn ? 'আদায়কারী:' : 'By:'} {p.recordedByName}
                           </span>
                           <div className="flex items-center gap-2">
@@ -3564,20 +3715,20 @@ export function App() {
                                     lang,
                                   })
                                 }
-                                className="px-3 py-1 rounded bg-slate-900 text-white font-semibold hover:bg-slate-800 flex items-center gap-1"
+                                className="px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 flex items-center gap-1.5 cursor-pointer"
                               >
-                                <Receipt className="w-3 h-3" />
+                                <Receipt className="w-3.5 h-3.5" />
                                 <span>
-                                  {isBn ? 'পিডিএফ / ছবি রসিদ' : 'View / Share Receipt'}
+                                  {isBn ? 'রসিদ ডাউনলোড/শেয়ার' : 'Receipt'}
                                 </span>
                               </button>
                             )}
                             {!p.isReversed && activeUser.role === 'OWNER' && (
                               <button
                                 onClick={() => handleReversePayment(p.id)}
-                                className="px-2.5 py-1 rounded border border-red-200 text-red-700 hover:bg-red-50 font-medium"
+                                className="px-2.5 py-2 rounded-xl border border-rose-200 text-rose-700 text-xs hover:bg-rose-50 font-semibold cursor-pointer"
                               >
-                                {isBn ? 'রিভার্স' : 'Reverse'}
+                                {isBn ? 'বাতিল' : 'Reverse'}
                               </button>
                             )}
                           </div>
@@ -3594,43 +3745,96 @@ export function App() {
         {/* ==================== 5. UTILITY BILLS & SHARED CHARGES ==================== */}
         {activeTab === 'BILLS' && (
           <div className="space-y-6">
-            <div className="border-b border-slate-200 pb-4">
-              <h1 className="text-xl font-bold text-slate-900">
-                {isBn
-                  ? 'বিদ্যুৎ, পানি, গ্যাস ও কাস্টম যৌথ বিল ব্যবস্থাপনা'
-                  : 'Utility Bills (Meter & Manual) & Custom Shared Charges'}
-              </h1>
-              <p className="text-xs text-slate-500 mt-1">
-                {isBn
-                  ? 'সাব-মিটার রিডিং বা ম্যানুয়াল এন্ট্রি এবং ভবনের যৌথ খরচ ফ্ল্যাট অনুযায়ী কাস্টম বণ্টন করুন।'
-                  : 'Calculate electricity/water bills from meter readings or manual entry, and distribute shared building expenses with custom per-unit allocations.'}
-              </p>
+            {/* Friendly Header + Mode Switcher */}
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-xl font-extrabold text-slate-900">
+                  {isBn
+                    ? 'বিদ্যুৎ, গ্যাস, পানি ও যৌথ বিল'
+                    : 'Electricity, Gas, Water & Shared Bills'}
+                </h1>
+                <p className="text-sm text-slate-500 mt-1">
+                  {isBn
+                    ? 'নিচের ট্যাব থেকে একক ফ্ল্যাটের মিটার বিল অথবা পুরো ভবনের যৌথ বিল বণ্টন বেছে নিন।'
+                    : 'Switch between individual unit utility bills and building-wide shared expense split.'}
+                </p>
+              </div>
+              <div className="inline-flex rounded-2xl bg-slate-100 p-1.5 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setBillTabMode('UTILITY')}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    billTabMode === 'UTILITY'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {isBn ? '⚡ একক ফ্ল্যাটের বিল' : '⚡ Single Unit Bill'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillTabMode('SHARED')}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                    billTabMode === 'SHARED'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {isBn ? '🏢 যৌথ বিল বণ্টন' : '🏢 Shared Building Split'}
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left: Meter / Manual Utility Bill Entry */}
+            {/* Active Bill Form (Only 1 shown at a time for zero clutter!) */}
+            {billTabMode === 'UTILITY' ? (
               <form
                 onSubmit={handlePostUtilityBill}
-                className="rounded-xl bg-white border border-slate-200 p-6 space-y-4"
+                className="rounded-3xl bg-white border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-5 max-w-3xl"
               >
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-emerald-600" />
-                  <span>
-                    {isBn
-                      ? 'ইউটিলিটি বিল এন্ট্রি (মিটার বা ম্যানুয়াল)'
-                      : 'Post Unit Utility Bill (Meter or Manual)'}
-                  </span>
-                </h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-emerald-600" />
+                    <span>
+                      {isBn
+                        ? 'একক ফ্ল্যাটের ইউটিলিটি বিল যোগ করুন'
+                        : 'Add Single Flat Utility Bill'}
+                    </span>
+                  </h2>
+                  <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setBillMode('METER')}
+                      className={`px-3 py-1.5 rounded-lg transition-all ${
+                        billMode === 'METER'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600'
+                      }`}
+                    >
+                      {isBn ? 'মিটার রিডিং হিসাব' : 'Meter Reading'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBillMode('MANUAL')}
+                      className={`px-3 py-1.5 rounded-lg transition-all ${
+                        billMode === 'MANUAL'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600'
+                      }`}
+                    >
+                      {isBn ? 'সরাসরি টাকা এন্ট্রি' : 'Fixed Amount'}
+                    </button>
+                  </div>
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'ফ্ল্যাট নির্বাচন *' : 'Occupied Unit *'}
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      {isBn ? 'ফ্ল্যাট নির্বাচন করুন *' : 'Occupied Flat *'}
                     </label>
                     <select
                       value={billUnitId}
                       onChange={(e) => setBillUnitId(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-semibold"
                     >
                       {db.units
                         .filter((u) => u.status === 'OCCUPIED')
@@ -3647,65 +3851,40 @@ export function App() {
                     </select>
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'বিলের ধরন *' : 'Utility Category *'}
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      {isBn ? 'বিলের ধরন *' : 'Bill Type *'}
                     </label>
                     <select
                       value={billType}
                       onChange={(e) =>
                         setBillType(e.target.value as UtilityType)
                       }
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-semibold"
                     >
-                      <option value="ELECTRICITY">Electricity (বিদ্যুৎ)</option>
-                      <option value="WATER">Water / WASA (পানি)</option>
-                      <option value="GAS">Gas / Titas (গ্যাস)</option>
-                      <option value="SERVICE">Service Charge</option>
+                      <option value="ELECTRICITY">⚡ বিদ্যুৎ বিল (Electricity)</option>
+                      <option value="WATER">💧 পানির বিল (WASA / Water)</option>
+                      <option value="GAS">🔥 গ্যাস বিল (Titas / Gas)</option>
+                      <option value="SERVICE">🛠️ সার্ভিস চার্জ (Service)</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'বিলিং মাস *' : 'Billing Period *'}
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      {isBn ? 'বিলিং মাস *' : 'Billing Month *'}
                     </label>
                     <input
                       type="month"
                       value={billPeriod}
                       onChange={(e) => setBillPeriod(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-2 font-mono"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono font-bold"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setBillMode('METER')}
-                    className={`px-3 py-1.5 rounded-md font-medium ${
-                      billMode === 'METER'
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    {isBn ? 'মিটার রিডিং হিসাব (Meter-Based)' : 'Meter-Based Calculation'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBillMode('MANUAL')}
-                    className={`px-3 py-1.5 rounded-md font-medium ${
-                      billMode === 'MANUAL'
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    {isBn ? 'সরাসরি টাকা এন্ট্রি (Manual)' : 'Manual Amount Entry'}
-                  </button>
-                </div>
-
                 {billMode === 'METER' ? (
-                  <div className="space-y-3 text-xs">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div className="space-y-4 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-sm">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div>
-                        <label className="block font-medium text-slate-700 mb-1">
+                        <label className="block font-bold text-slate-700 mb-1">
                           {isBn ? 'পূর্বের রিডিং' : 'Prev Reading'}
                         </label>
                         <input
@@ -3713,11 +3892,11 @@ export function App() {
                           step="0.01"
                           value={billPrevReading}
                           onChange={(e) => setBillPrevReading(e.target.value)}
-                          className="w-full rounded-lg border border-slate-300 px-2.5 py-2 font-mono"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono font-bold"
                         />
                       </div>
                       <div>
-                        <label className="block font-medium text-slate-700 mb-1">
+                        <label className="block font-bold text-slate-700 mb-1">
                           {isBn ? 'বর্তমান রিডিং' : 'Curr Reading'}
                         </label>
                         <input
@@ -3725,112 +3904,111 @@ export function App() {
                           step="0.01"
                           value={billCurrReading}
                           onChange={(e) => setBillCurrReading(e.target.value)}
-                          className="w-full rounded-lg border border-slate-300 px-2.5 py-2 font-mono"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono font-bold"
                         />
                       </div>
                       <div>
-                        <label className="block font-medium text-slate-700 mb-1">
-                          {isBn ? 'ইউনিট দর (৳)' : 'Rate/Unit (BDT)'}
+                        <label className="block font-bold text-slate-700 mb-1">
+                          {isBn ? 'ইউনিট দর (৳)' : 'Rate/Unit (৳)'}
                         </label>
                         <input
                           type="number"
                           step="0.01"
                           value={billRateTaka}
                           onChange={(e) => setBillRateTaka(e.target.value)}
-                          className="w-full rounded-lg border border-slate-300 px-2.5 py-2 font-mono"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono font-bold"
                         />
                       </div>
                       <div>
-                        <label className="block font-medium text-slate-700 mb-1">
-                          {isBn ? 'ফিক্সড চার্জ (৳)' : 'Fixed Charge (BDT)'}
+                        <label className="block font-bold text-slate-700 mb-1">
+                          {isBn ? 'ফিক্সড চার্জ (৳)' : 'Fixed Charge (৳)'}
                         </label>
                         <input
                           type="number"
                           step="0.01"
                           value={billFixedTaka}
                           onChange={(e) => setBillFixedTaka(e.target.value)}
-                          className="w-full rounded-lg border border-slate-300 px-2.5 py-2 font-mono"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 font-mono font-bold"
                         />
                       </div>
                     </div>
-                    <label className="flex items-center gap-2 text-slate-600">
+                    <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={billRollover}
                         onChange={(e) => setBillRollover(e.target.checked)}
+                        className="rounded"
                       />
                       <span>
                         {isBn
-                          ? 'মিটার রিসেট বা পরিবর্তন অনুমোদন (Authorize Meter Reset/Rollover)'
-                          : 'Authorize meter reset/rollover (if current reading < previous)'}
+                          ? 'নতুন মিটার বা রিসেট হলে টিক দিন (বর্তমান রিডিং পূর্বের চেয়ে কম হলে)'
+                          : 'Allow meter rollover/reset if current reading is lower'}
                       </span>
                     </label>
                   </div>
                 ) : (
-                  <div className="text-xs">
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'মোট বিলের পরিমাণ (৳) *' : 'Manual Bill Amount (BDT) *'}
+                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-sm">
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      {isBn ? 'মোট বিলের পরিমাণ (৳) *' : 'Total Bill Amount (BDT) *'}
                     </label>
                     <input
                       type="number"
                       step="0.01"
                       value={billManualTaka}
                       onChange={(e) => setBillManualTaka(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-mono text-lg font-extrabold"
                     />
                   </div>
                 )}
 
-                <div className="flex items-center justify-between text-xs">
-                  <label className="flex items-center gap-2 text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={billAllowDuplicate}
-                      onChange={(e) => setBillAllowDuplicate(e.target.checked)}
-                    />
-                    <span>
-                      {isBn
-                        ? 'একই মাসে অতিরিক্ত বিল পোস্ট করার অনুমতি দিন'
-                        : 'Explicitly allow additional charge for same period'}
-                    </span>
-                  </label>
-                </div>
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={billAllowDuplicate}
+                    onChange={(e) => setBillAllowDuplicate(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span>
+                    {isBn
+                      ? 'একই মাসে দ্বিতীয়বার অতিরিক্ত বিল যোগ করার অনুমতি দিন'
+                      : 'Allow posting an additional bill in the same month'}
+                  </span>
+                </label>
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 px-4 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
+                  className="w-full py-3.5 px-6 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-extrabold shadow-sm transition-all"
                 >
-                  {isBn ? 'ইউটিলিটি বিল পোস্ট করুন' : 'Post Utility Bill'}
+                  {isBn ? 'বিল সংরক্ষণ করুন' : 'Save Utility Bill'}
                 </button>
               </form>
-
-              {/* Right: Custom Shared Building Charge Allocation */}
+            ) : (
               <form
                 onSubmit={handlePostSharedCharge}
-                className="rounded-xl bg-white border border-slate-200 p-6 space-y-4"
+                className="rounded-3xl bg-white border border-slate-200/80 p-6 sm:p-8 shadow-sm space-y-5 max-w-3xl"
               >
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-bold text-slate-900">
+                <div className="border-b border-slate-100 pb-4">
+                  <h2 className="text-lg font-extrabold text-slate-900">
                     {isBn
-                      ? 'যৌথ খরচ কাস্টম বণ্টন (Shared Charge Allocation)'
-                      : 'Custom Shared Building Charge Distribution'}
+                      ? 'ভবনের যৌথ বিল সব ফ্ল্যাটে ভাগ করে দিন'
+                      : 'Split Shared Building Charge Across Flats'}
                   </h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {isBn
+                      ? 'দারোয়ান, লিফট বা কমন কারেন্ট বিল সব ফ্ল্যাটে সমান বা ইচ্ছামতো ভাগ করে দিন।'
+                      : 'Split common charges equally or assign custom amounts per flat.'}
+                  </p>
                 </div>
-                <p className="text-xs text-slate-500">
-                  {isBn
-                    ? 'বাড়িওয়ালার পছন্দমতো প্রতিটি ফ্ল্যাটে কাস্টম পরিমাণ নির্ধারণ করুন। সকল ফ্ল্যাটের যোগফল মোট খরচের সমান হতে হবে।'
-                    : 'Assign custom BDT amounts to each occupied unit. Total allocated must reconcile exactly with the total shared expense.'}
-                </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
+                    <label className="block font-bold text-slate-700 mb-1.5">
                       {isBn ? 'ভবন' : 'Building'}
                     </label>
                     <select
                       value={scBuildingId}
                       onChange={(e) => setScBuildingId(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-semibold"
                     >
                       {db.buildings.map((b) => (
                         <option key={b.id} value={b.id}>
@@ -3840,33 +4018,33 @@ export function App() {
                     </select>
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'খরচের শিরোনাম' : 'Shared Charge Title'}
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      {isBn ? 'খরচের নাম' : 'Charge Title'}
                     </label>
                     <input
                       type="text"
                       value={scTitle}
                       onChange={(e) => setScTitle(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
                     />
                   </div>
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'মোট বণ্টনযোগ্য টাকা (৳)' : 'Total Shared Amount (BDT)'}
+                    <label className="block font-bold text-slate-700 mb-1.5">
+                      {isBn ? 'মোট টাকা (৳)' : 'Total Shared Amount (৳)'}
                     </label>
                     <input
                       type="number"
                       value={scTotalTaka}
                       onChange={(e) => setScTotalTaka(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-2 font-mono font-bold"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono font-extrabold"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-lg p-3 bg-slate-50">
-                  <div className="flex justify-between items-center text-xs pb-1 border-b border-slate-200">
-                    <span className="font-semibold text-slate-700">
-                      {isBn ? 'ফ্ল্যাট ও ভাড়াটিয়া' : 'Occupied Unit & Tenant'}
+                <div className="space-y-2.5 max-h-60 overflow-y-auto border border-slate-200 rounded-2xl p-4 bg-slate-50">
+                  <div className="flex justify-between items-center text-sm pb-2 border-b border-slate-200">
+                    <span className="font-bold text-slate-700">
+                      {isBn ? 'ফ্ল্যাট ও ভাড়াটিয়া' : 'Occupied Flat & Tenant'}
                     </span>
                     <button
                       type="button"
@@ -3884,20 +4062,18 @@ export function App() {
                         });
                         setScCustomUnitTaka(nextMap);
                       }}
-                      className="text-emerald-700 font-semibold hover:underline"
+                      className="px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 text-xs font-extrabold hover:bg-emerald-200 transition-colors"
                     >
-                      {isBn
-                        ? 'প্রাথমিক সমান ভাগ বসান (রাউন্ডিং সহ)'
-                        : 'Pre-fill Equal Split (with exact rounding)'}
+                      {isBn ? '✨ সমান ভাগে বসান' : '✨ Auto Equal Split'}
                     </button>
                   </div>
                   {scBuildingUnits.map(({ unit, tenant }) => (
                     <div
                       key={unit.id}
-                      className="flex items-center justify-between gap-2 text-xs"
+                      className="flex items-center justify-between gap-3 text-sm py-1"
                     >
-                      <span>
-                        <strong>{unit.unitNumber}</strong> — {tenant?.fullName}
+                      <span className="text-slate-800">
+                        <strong className="font-extrabold">{unit.unitNumber}</strong> — {tenant?.fullName}
                       </span>
                       <input
                         type="number"
@@ -3910,25 +4086,25 @@ export function App() {
                             [unit.id]: e.target.value,
                           }))
                         }
-                        className="w-28 rounded border border-slate-300 bg-white px-2.5 py-1 text-right font-mono"
+                        className="w-32 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-right font-mono font-bold"
                       />
                     </div>
                   ))}
                 </div>
 
-                <div className="flex items-center justify-between text-xs font-mono px-3 py-2 rounded bg-slate-100">
+                <div className="flex items-center justify-between text-sm font-mono px-4 py-3 rounded-2xl bg-slate-100">
                   <span>
-                    {isBn ? 'বণ্টিত যোগফল:' : 'Allocated Sum:'}{' '}
-                    {formatBDT(scValidation.allocatedSumPoisha, lang)}
+                    {isBn ? 'মোট বণ্টিত:' : 'Allocated:'}{' '}
+                    <strong>{formatBDT(scValidation.allocatedSumPoisha, lang)}</strong>
                   </span>
                   <span
                     className={
                       scValidation.differencePoisha === 0
-                        ? 'text-emerald-700 font-bold'
-                        : 'text-red-600 font-bold'
+                        ? 'text-emerald-700 font-extrabold'
+                        : 'text-red-600 font-extrabold'
                     }
                   >
-                    {isBn ? 'পার্থক্য:' : 'Unallocated Diff:'}{' '}
+                    {isBn ? 'বাকি পার্থক্য:' : 'Difference:'}{' '}
                     {formatBDT(scValidation.differencePoisha, lang)}
                   </span>
                 </div>
@@ -3936,72 +4112,70 @@ export function App() {
                 <button
                   type="submit"
                   disabled={!scValidation.isValid}
-                  className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-40"
+                  className="w-full py-3.5 px-6 rounded-2xl bg-emerald-600 text-white text-sm font-extrabold hover:bg-emerald-700 disabled:opacity-40 shadow-sm"
                 >
                   {isBn
-                    ? 'কাস্টম যৌথ বিল পোস্ট করুন'
-                    : 'Post Reconciled Shared Charge'}
+                    ? 'যৌথ বিল সব ফ্ল্যাটে যোগ করুন'
+                    : 'Post Shared Charge to Flats'}
                 </button>
               </form>
-            </div>
+            )}
 
-            {/* Posted Utility Bills Table */}
-            <div className="rounded-xl bg-white border border-slate-200 p-5">
-              <h3 className="text-sm font-bold text-slate-900 mb-3">
+            {/* Posted Utility Bills Cards */}
+            <div className="rounded-3xl bg-white border border-slate-200/80 p-6 shadow-sm">
+              <h3 className="text-base font-extrabold text-slate-900 mb-4">
                 {isBn
                   ? 'পোস্টকৃত ইউটিলিটি ও যৌথ বিলের তালিকা'
-                  : 'Posted Utility & Shared Bills Ledger'}
+                  : 'Posted Utility & Shared Bills'}
               </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-500">
-                      <th className="py-2 pr-3">{isBn ? 'মাস' : 'Period'}</th>
-                      <th className="py-2 px-3">{isBn ? 'ফ্ল্যাট ও ভাড়াটিয়া' : 'Unit & Tenant'}</th>
-                      <th className="py-2 px-3">{isBn ? 'ধরন ও মিটার বিবরণ' : 'Category & Reading'}</th>
-                      <th className="py-2 px-3 text-right">{isBn ? 'মোট বিল' : 'Total Bill'}</th>
-                      <th className="py-2 px-3 text-right">{isBn ? 'পরিশোধিত' : 'Paid'}</th>
-                      <th className="py-2 pl-3 text-right">{isBn ? 'বকেয়া' : 'Outstanding'}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {db.utilityBills.map((ub) => {
-                      const u = db.units.find((x) => x.id === ub.unitId);
-                      const t = db.tenants.find((x) => x.id === ub.tenantId);
-                      const rem = Math.max(
-                        0,
-                        ub.totalAmountPoisha - ub.paidAmountPoisha
-                      );
-                      return (
-                        <tr key={ub.id} className="hover:bg-slate-50">
-                          <td className="py-2.5 pr-3 font-mono">
-                            {ub.billingPeriod}
-                          </td>
-                          <td className="py-2.5 px-3 font-medium">
-                            {u?.unitNumber} — {t?.fullName}
-                          </td>
-                          <td className="py-2.5 px-3 text-slate-600">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {db.utilityBills.map((ub) => {
+                  const u = db.units.find((x) => x.id === ub.unitId);
+                  const t = db.tenants.find((x) => x.id === ub.tenantId);
+                  const rem = Math.max(
+                    0,
+                    ub.totalAmountPoisha - ub.paidAmountPoisha
+                  );
+                  return (
+                    <div
+                      key={ub.id}
+                      className="rounded-2xl border border-slate-200/90 p-4 hover:border-slate-300 transition-all flex flex-col justify-between gap-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="inline-block px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-800 font-extrabold text-xs">
+                            {u?.unitNumber} · {ub.billingPeriod}
+                          </span>
+                          <div className="text-sm font-bold text-slate-900 mt-1">
+                            {t?.fullName}
+                          </div>
+                          <div className="text-xs text-slate-500 mt-0.5">
                             {ub.utilityType} ({ub.billingMode})
                             {ub.billingMode === 'METER'
-                              ? ` · ${ub.prevReading} → ${ub.currReading} (${ub.consumptionUnits} units)`
+                              ? ` · ${ub.prevReading} → ${ub.currReading}`
                               : ub.notes
                               ? ` · ${ub.notes}`
                               : ''}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono tabular-nums">
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-extrabold font-mono text-slate-900">
                             {formatBDT(ub.totalAmountPoisha, lang)}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono tabular-nums text-emerald-700">
-                            {formatBDT(ub.paidAmountPoisha, lang)}
-                          </td>
-                          <td className="py-2.5 pl-3 text-right font-mono tabular-nums font-semibold text-red-600">
-                            {formatBDT(rem, lang)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                          </div>
+                          {rem > 0 ? (
+                            <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-red-50 text-red-700 text-[11px] font-bold">
+                              {isBn ? 'বকেয়া:' : 'Due:'} {formatBDT(rem, lang)}
+                            </span>
+                          ) : (
+                            <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-bold">
+                              {isBn ? 'পরিশোধিত' : 'Paid'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -4010,201 +4184,223 @@ export function App() {
         {/* ==================== 6. PROPERTY EXPENSES ==================== */}
         {activeTab === 'EXPENSES' && (
           <div className="space-y-6">
-            <div className="border-b border-slate-200 pb-4">
-              <h1 className="text-xl font-bold text-slate-900">
-                {isBn
-                  ? 'ভবনের রক্ষণাবেক্ষণ ও পরিচালন খরচ'
-                  : 'Property Operating Expenses & Maintenance Ledger'}
-              </h1>
-              <p className="text-xs text-slate-500 mt-1">
-                {isBn
-                  ? 'কেয়ারটেকারের বেতন, লিফট সার্ভিসিং, মেরামত, রং ও ট্যাক্স খরচ সংরক্ষণ করুন যা নিট ক্যাশ ফ্লোতে প্রতিফলিত হয়।'
-                  : 'Record repairs, caretaker wages, lift servicing, common utilities, and property taxes.'}
-              </p>
+            {/* Friendly Header + Add Expense Button */}
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-xl font-extrabold text-slate-900">
+                  {isBn
+                    ? 'ভবনের রক্ষণাবেক্ষণ ও খরচ'
+                    : 'Property Maintenance & Operating Expenses'}
+                </h1>
+                <p className="text-sm text-slate-500 mt-1">
+                  {isBn
+                    ? 'দারোয়ানের বেতন, লিফট সার্ভিসিং, মেরামত ও ট্যাক্স খরচ সংরক্ষণ করুন।'
+                    : 'Record caretaker wages, repairs, lift servicing, and property taxes.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExpenseModal(true)}
+                className="px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2 shadow-sm transition-all self-start sm:self-auto"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{isBn ? 'নতুন খরচ যোগ করুন' : 'Add New Expense'}</span>
+              </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              <form
-                onSubmit={handleAddExpense}
-                className="lg:col-span-5 rounded-xl bg-white border border-slate-200 p-6 space-y-3.5 text-xs"
-              >
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Wrench className="w-4 h-4 text-emerald-600" />
-                  <span>{isBn ? 'নতুন খরচ যোগ করুন' : 'Record Property Expense'}</span>
-                </h2>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'ভবন *' : 'Building *'}
-                    </label>
-                    <select
-                      value={expBuildingId}
-                      onChange={(e) => setExpBuildingId(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
+            {/* Modal for Adding New Expense */}
+            {showExpenseModal && (
+              <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <form
+                  onSubmit={(e) => {
+                    handleAddExpense(e);
+                    setShowExpenseModal(false);
+                  }}
+                  className="bg-white rounded-3xl border border-slate-200 max-w-lg w-full p-6 sm:p-7 shadow-2xl space-y-4 text-sm animate-in fade-in zoom-in-95 duration-150"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                      <Wrench className="w-5 h-5 text-emerald-600" />
+                      <span>{isBn ? 'নতুন খরচ যোগ করুন' : 'Record Property Expense'}</span>
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setShowExpenseModal(false)}
+                      className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200"
                     >
-                      {db.buildings.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name}
-                        </option>
-                      ))}
-                    </select>
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'ফ্ল্যাট (ঐচ্ছিক)' : 'Unit (Optional)'}
-                    </label>
-                    <select
-                      value={expUnitId}
-                      onChange={(e) => setExpUnitId(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                    >
-                      <option value="">Building-Wide</option>
-                      {db.units
-                        .filter((u) => u.buildingId === expBuildingId)
-                        .map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.unitNumber}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        {isBn ? 'ভবন *' : 'Building *'}
+                      </label>
+                      <select
+                        value={expBuildingId}
+                        onChange={(e) => setExpBuildingId(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-semibold"
+                      >
+                        {db.buildings.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
                           </option>
                         ))}
-                    </select>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        {isBn ? 'ফ্ল্যাট (ঐচ্ছিক)' : 'Flat (Optional)'}
+                      </label>
+                      <select
+                        value={expUnitId}
+                        onChange={(e) => setExpUnitId(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
+                      >
+                        <option value="">{isBn ? 'পুরো ভবনের খরচ' : 'Entire Building'}</option>
+                        {db.units
+                          .filter((u) => u.buildingId === expBuildingId)
+                          .map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.unitNumber}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'খাত (Category) *' : 'Expense Category *'}
-                    </label>
-                    <select
-                      value={expCategory}
-                      onChange={(e) =>
-                        setExpCategory(e.target.value as ExpenseCategory)
-                      }
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                    >
-                      <option value="REPAIRS">Repairs & Maintenance</option>
-                      <option value="PAINTING">Painting</option>
-                      <option value="CLEANING">Cleaning</option>
-                      <option value="SECURITY_CARETAKER">
-                        Security & Caretaker Wages
-                      </option>
-                      <option value="LIFT">Lift Maintenance</option>
-                      <option value="COMMON_UTILITY">
-                        Common Electricity & Water
-                      </option>
-                      <option value="PLUMBING">Plumbing</option>
-                      <option value="TAX_FEES">Property Taxes / Fees</option>
-                      <option value="OTHER">Other Expense</option>
-                    </select>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        {isBn ? 'খরচের খাত *' : 'Category *'}
+                      </label>
+                      <select
+                        value={expCategory}
+                        onChange={(e) =>
+                          setExpCategory(e.target.value as ExpenseCategory)
+                        }
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-semibold"
+                      >
+                        <option value="REPAIRS">মেরামত (Repairs)</option>
+                        <option value="SECURITY_CARETAKER">দারোয়ান/কেয়ারটেকার বেতন</option>
+                        <option value="LIFT">লিফট সার্ভিসিং (Lift)</option>
+                        <option value="COMMON_UTILITY">কমন বিদ্যুৎ ও পানি</option>
+                        <option value="CLEANING">পরিষ্কার-পরিচ্ছন্নতা</option>
+                        <option value="PAINTING">রং ও সংস্কার (Painting)</option>
+                        <option value="PLUMBING">প্লাম্বিং/পানির লাইন</option>
+                        <option value="TAX_FEES">সিটি কর্পোরেশন ট্যাক্স/ফি</option>
+                        <option value="OTHER">অন্যান্য খরচ</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        {isBn ? 'টাকার পরিমাণ (৳) *' : 'Amount (BDT) *'}
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={expAmountTaka}
+                        onChange={(e) => setExpAmountTaka(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono font-extrabold"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'খরচের পরিমাণ (৳) *' : 'Amount (BDT) *'}
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      value={expAmountTaka}
-                      onChange={(e) => setExpAmountTaka(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono font-bold"
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'তারিখ *' : 'Date *'}
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={expDate}
-                      onChange={(e) => setExpDate(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono"
-                    />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        {isBn ? 'তারিখ *' : 'Date *'}
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={expDate}
+                        onChange={(e) => setExpDate(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        {isBn ? 'ভেন্ডর / প্রাপকের নাম' : 'Vendor / Payee'}
+                      </label>
+                      <input
+                        type="text"
+                        placeholder={isBn ? 'যেমন: করিম ইলেকট্রিক' : 'e.g. Dhaka Elevator Ltd.'}
+                        value={expVendor}
+                        onChange={(e) => setExpVendor(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
+                      />
+                    </div>
                   </div>
+
                   <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'ভেন্ডর / প্রাপক' : 'Vendor / Payee'}
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isBn ? 'খরচের বিবরণ *' : 'Description *'}
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Dhaka Elevator Ltd."
-                      value={expVendor}
-                      onChange={(e) => setExpVendor(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                      required
+                      placeholder={isBn ? 'খরচের সংক্ষিপ্ত বিবরণ লিখুন' : 'Reason for expense'}
+                      value={expDesc}
+                      onChange={(e) => setExpDesc(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    {isBn ? 'বিবরণ *' : 'Description *'}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Detailed reason for expense"
-                    value={expDesc}
-                    onChange={(e) => setExpDesc(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 px-4 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800"
-                >
-                  {isBn ? 'খরচ সংরক্ষণ করুন' : 'Save Expense Record'}
-                </button>
-              </form>
-
-              <div className="lg:col-span-7 rounded-xl bg-white border border-slate-200 p-6">
-                <h2 className="text-base font-bold text-slate-900 mb-4">
-                  {isBn ? 'খরচের তালিকা' : 'Recorded Property Expenses'}
-                </h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2 pr-3">{isBn ? 'তারিখ' : 'Date'}</th>
-                        <th className="py-2 px-3">{isBn ? 'ভবন' : 'Building'}</th>
-                        <th className="py-2 px-3">{isBn ? 'খাত ও বিবরণ' : 'Category & Description'}</th>
-                        <th className="py-2 pl-3 text-right">{isBn ? 'পরিমাণ' : 'Amount'}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {db.expenses.map((e) => {
-                        const b = db.buildings.find(
-                          (x) => x.id === e.buildingId
-                        );
-                        return (
-                          <tr key={e.id} className="hover:bg-slate-50">
-                            <td className="py-3 pr-3 font-mono text-slate-600">
-                              {e.date}
-                            </td>
-                            <td className="py-3 px-3 font-medium text-slate-900">
-                              {b?.name}
-                            </td>
-                            <td className="py-3 px-3 text-slate-700">
-                              <span className="font-semibold">
-                                {e.category}
-                              </span>{' '}
-                              — {e.description}
-                              {e.vendor ? ` (${e.vendor})` : ''}
-                            </td>
-                            <td className="py-3 pl-3 text-right font-mono tabular-nums font-bold text-slate-900">
-                              {formatBDT(e.amountPoisha, lang)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowExpenseModal(false)}
+                      className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold"
+                    >
+                      {isBn ? 'বাতিল' : 'Cancel'}
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white font-extrabold hover:bg-emerald-700"
+                    >
+                      {isBn ? 'খরচ সংরক্ষণ করুন' : 'Save Expense'}
+                    </button>
+                  </div>
+                </form>
               </div>
+            )}
+
+            {/* Expenses Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {db.expenses.map((e) => {
+                const b = db.buildings.find((x) => x.id === e.buildingId);
+                return (
+                  <div
+                    key={e.id}
+                    className="rounded-3xl bg-white border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between gap-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="inline-block px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-extrabold">
+                          {e.category}
+                        </span>
+                        <h3 className="text-base font-extrabold text-slate-900 mt-2">
+                          {e.description}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {b?.name} {e.vendor ? `· ${e.vendor}` : ''}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-extrabold font-mono text-slate-900">
+                          {formatBDT(e.amountPoisha, lang)}
+                        </div>
+                        <div className="text-xs font-mono text-slate-400 mt-0.5">
+                          {e.date}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -4212,60 +4408,59 @@ export function App() {
         {/* ==================== 7. REPORTS & AUDIT HISTORY ==================== */}
         {activeTab === 'REPORTS' && (
           <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h1 className="text-xl font-bold text-slate-900">
+                <h1 className="text-xl font-extrabold text-slate-900">
                   {isBn
-                    ? 'আর্থিক প্রতিবেদন, ভাড়াটিয়া লেজার ও অডিট ট্রেইল'
-                    : 'Financial Reports, Tenant Ledgers & Immutable Audit History'}
+                    ? 'আর্থিক হিসাব ও রিপোর্ট সমূহ'
+                    : 'Financial Statements & Property Reports'}
                 </h1>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-sm text-slate-500 mt-1">
                   {isBn
-                    ? 'ড্যাশবোর্ডের একই ডাটাবেস ও সূত্র হতে প্রস্তুতকৃত ১১ ধরনের রিপোর্ট। CSV (Excel) বা প্রিন্ট/PDF আকারে সংরক্ষণ করুন।'
-                    : 'All 11 authoritative reports reconcile strictly with the local SQLite/IndexedDB ledger. Export to Excel CSV or PDF.'}
+                    ? 'মাসিক আয়-ব্যয়, ভাড়াটিয়া লেজার এবং বকেয়া রিপোর্ট দেখুন ও প্রিন্ট বা Excel-এ ডাউনলোড করুন।'
+                    : 'View and export monthly statements, tenant ledgers, and outstanding dues.'}
                 </p>
               </div>
-              <div className="flex items-center gap-2 no-print">
+              <div className="flex items-center gap-2.5 no-print">
                 <button
                   onClick={handleExportCsvReport}
-                  className="px-3.5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 flex items-center gap-1.5"
+                  className="px-4 py-2.5 rounded-2xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 flex items-center gap-2 shadow-sm"
                 >
                   <FileSpreadsheet className="w-4 h-4" />
-                  <span>{isBn ? 'CSV / Excel এক্সপোর্ট' : 'Export CSV / Excel'}</span>
+                  <span>{isBn ? 'Excel ডাউনলোড' : 'Export Excel'}</span>
                 </button>
                 <button
                   onClick={() => window.print()}
-                  className="px-3.5 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 flex items-center gap-1.5"
+                  className="px-4 py-2.5 rounded-2xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 flex items-center gap-2 shadow-sm"
                 >
                   <Printer className="w-4 h-4" />
-                  <span>{isBn ? 'পিডিএফ / প্রিন্ট' : 'Print / Save PDF'}</span>
+                  <span>{isBn ? 'প্রিন্ট / PDF' : 'Print / PDF'}</span>
                 </button>
               </div>
             </div>
 
-            {/* 11 Report Selector Tabs */}
-            <div className="flex flex-wrap gap-1.5 bg-white p-2 rounded-xl border border-slate-200 no-print">
+            {/* Report Selector Pills */}
+            <div className="flex flex-wrap gap-2 bg-white p-3 rounded-3xl border border-slate-200/80 shadow-sm no-print">
               {(
                 [
-                  ['MONTHLY', isBn ? 'মাসিক রিপোর্ট' : '1. Monthly Summary'],
-                  ['YEARLY', isBn ? 'বার্ষিক রিপোর্ট' : '2. Yearly Summary'],
-                  ['TENANT_LEDGER', isBn ? 'ভাড়াটিয়া লেজার' : '3. Tenant Ledger'],
-                  ['OUTSTANDING_DUES', isBn ? 'বকেয়া তালিকা' : '4. Outstanding Dues'],
-                  ['BUILDING_FINANCE', isBn ? 'ভবনভিত্তিক হিসাব' : '5. Building Finance'],
-                  ['RENT_COLLECTION', isBn ? 'ভাড়া আদায় রিপোর্ট' : '6. Rent Collection'],
-                  ['UTILITY_BILLING', isBn ? 'ইউটিলিটি বিল রিপোর্ট' : '7. Utility Billing'],
-                  ['EXPENSE_REPORT', isBn ? 'খরচ রিপোর্ট' : '8. Expense Report'],
-                  ['SECURITY_DEPOSIT', isBn ? 'জামানত রিপোর্ট' : '9. Security Deposits'],
-                  ['OCCUPANCY', isBn ? 'ফ্ল্যাট দখল রিপোর্ট' : '10. Occupancy Report'],
-                  ['AUDIT_HISTORY', isBn ? 'অডিট ইতিহাস' : '11. Audit History'],
+                  ['MONTHLY', isBn ? '📊 মাসিক রিপোর্ট' : 'Monthly Summary'],
+                  ['OUTSTANDING_DUES', isBn ? '⚠️ বকেয়া তালিকা' : 'Outstanding Dues'],
+                  ['TENANT_LEDGER', isBn ? '👥 ভাড়াটিয়া লেজার' : 'Tenant Ledger'],
+                  ['RENT_COLLECTION', isBn ? '🧾 ভাড়া আদায়' : 'Rent Collection'],
+                  ['UTILITY_BILLING', isBn ? '⚡ ইউটিলিটি বিল' : 'Utility Billing'],
+                  ['EXPENSE_REPORT', isBn ? '🛠️ খরচ রিপোর্ট' : 'Expense Report'],
+                  ['SECURITY_DEPOSIT', isBn ? '🛡️ জামানত হিসাব' : 'Security Deposits'],
+                  ['OCCUPANCY', isBn ? '🏢 ফ্ল্যাট দখল' : 'Occupancy'],
+                  ['YEARLY', isBn ? '📅 বার্ষিক হিসাব' : 'Yearly Summary'],
+                  ['AUDIT_HISTORY', isBn ? '📋 অডিট লগ' : 'Audit History'],
                 ] as [ReportType, string][]
               ).map(([rk, label]) => (
                 <button
                   key={rk}
                   onClick={() => setReportType(rk)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-2xl text-sm font-bold transition-all ${
                     reportType === rk
-                      ? 'bg-slate-900 text-white'
+                      ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-600 hover:bg-slate-100'
                   }`}
                 >
@@ -4275,76 +4470,78 @@ export function App() {
             </div>
 
             {/* Report Content Box */}
-            <div className="rounded-xl bg-white border border-slate-200 p-6 space-y-4">
+            <div className="rounded-3xl bg-white border border-slate-200/80 p-6 shadow-sm space-y-4">
               {(reportType === 'MONTHLY' ||
                 reportType === 'BUILDING_FINANCE' ||
                 reportType === 'YEARLY') && (
                 <div className="space-y-4">
-                  <h2 className="text-base font-bold text-slate-900">
+                  <h2 className="text-lg font-extrabold text-slate-900">
                     {reportType === 'YEARLY'
-                      ? `Yearly Financial Statement (${selectedPeriod.slice(0, 4)})`
-                      : `Building-Wise Monthly Financial Reconciliation (${selectedPeriod})`}
+                      ? isBn
+                        ? `বার্ষিক আয়-ব্যয় বিবরণী (${selectedPeriod.slice(0, 4)})`
+                        : `Yearly Financial Statement (${selectedPeriod.slice(0, 4)})`
+                      : isBn
+                      ? `ভবনভিত্তিক মাসিক আয়-ব্যয় হিসাব (${selectedPeriod})`
+                      : `Building-Wise Monthly Reconciliation (${selectedPeriod})`}
                   </h2>
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2 pr-3">Building</th>
-                        <th className="py-2 px-3 text-right">Charges Billed</th>
-                        <th className="py-2 px-3 text-right">Cash Collected</th>
-                        <th className="py-2 px-3 text-right">
-                          Outstanding Balance
-                        </th>
-                        <th className="py-2 px-3 text-right">Expenses</th>
-                        <th className="py-2 pl-3 text-right">
-                          Net Operating Cash Flow
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {summary.buildingBreakdown.map((b) => (
-                        <tr key={b.buildingId}>
-                          <td className="py-3 pr-3 font-bold">
-                            {b.buildingName}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono">
-                            {formatBDT(b.chargedPoisha, lang)}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono text-emerald-700 font-semibold">
-                            {formatBDT(b.collectedPoisha, lang)}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono text-red-600">
-                            {formatBDT(b.outstandingPoisha, lang)}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono">
-                            {formatBDT(b.expensesPoisha, lang)}
-                          </td>
-                          <td className="py-3 pl-3 text-right font-mono font-bold">
-                            {formatBDT(
-                              b.collectedPoisha - b.expensesPoisha,
-                              lang
-                            )}
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-3 pr-3">{isBn ? 'ভবন' : 'Building'}</th>
+                          <th className="py-3 px-3 text-right">{isBn ? 'মোট ধার্য' : 'Billed'}</th>
+                          <th className="py-3 px-3 text-right">{isBn ? 'আদায়কৃত' : 'Collected'}</th>
+                          <th className="py-3 px-3 text-right">{isBn ? 'বকেয়া' : 'Outstanding'}</th>
+                          <th className="py-3 px-3 text-right">{isBn ? 'খরচ' : 'Expenses'}</th>
+                          <th className="py-3 pl-3 text-right">{isBn ? 'নিট আয়' : 'Net Cash Flow'}</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {summary.buildingBreakdown.map((b) => (
+                          <tr key={b.buildingId} className="hover:bg-slate-50">
+                            <td className="py-3.5 pr-3 font-extrabold text-slate-900">
+                              {b.buildingName}
+                            </td>
+                            <td className="py-3.5 px-3 text-right font-mono">
+                              {formatBDT(b.chargedPoisha, lang)}
+                            </td>
+                            <td className="py-3.5 px-3 text-right font-mono text-emerald-700 font-bold">
+                              {formatBDT(b.collectedPoisha, lang)}
+                            </td>
+                            <td className="py-3.5 px-3 text-right font-mono text-red-600 font-bold">
+                              {formatBDT(b.outstandingPoisha, lang)}
+                            </td>
+                            <td className="py-3.5 px-3 text-right font-mono">
+                              {formatBDT(b.expensesPoisha, lang)}
+                            </td>
+                            <td className="py-3.5 pl-3 text-right font-mono font-extrabold text-slate-900">
+                              {formatBDT(
+                                b.collectedPoisha - b.expensesPoisha,
+                                lang
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
               {reportType === 'TENANT_LEDGER' && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-base font-bold text-slate-900">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <h2 className="text-lg font-extrabold text-slate-900">
                       {isBn
-                        ? 'ভাড়াটিয়া লেজার (সক্রিয় ও আর্কাইভকৃত সহ)'
-                        : 'Complete Tenant Ledger (Active & Archived Preserved)'}
+                        ? 'ভাড়াটিয়া লেজার (সক্রিয় ও পুরাতন)'
+                        : 'Complete Tenant Ledger'}
                     </h2>
                     <select
                       value={reportTenantId}
                       onChange={(e) => setReportTenantId(e.target.value)}
-                      className="rounded border border-slate-300 px-3 py-1.5 text-xs"
+                      className="rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-semibold"
                     >
-                      <option value="ALL">All Tenants (Active + Archived)</option>
+                      <option value="ALL">{isBn ? 'সকল ভাড়াটিয়া' : 'All Tenants'}</option>
                       {db.tenants.map((t) => (
                         <option key={t.id} value={t.id}>
                           {t.fullName} ({t.status})
@@ -4352,310 +4549,322 @@ export function App() {
                       ))}
                     </select>
                   </div>
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2 pr-3">Tenant</th>
-                        <th className="py-2 px-3">Status</th>
-                        <th className="py-2 px-3 text-right">Monthly Rent</th>
-                        <th className="py-2 px-3 text-right">Held Deposit</th>
-                        <th className="py-2 px-3 text-right">Advance Credit</th>
-                        <th className="py-2 pl-3 text-right">Current Unpaid</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {db.tenants
-                        .filter(
-                          (t) =>
-                            reportTenantId === 'ALL' || t.id === reportTenantId
-                        )
-                        .map((t) => {
-                          const dep = calculateTenantDepositBalance(
-                            t.id,
-                            db.depositTransactions
-                          );
-                          const due = getTenantUnpaidObligations(
-                            t.id,
-                            db.rentCharges,
-                            db.utilityBills
-                          ).reduce((s, o) => s + o.outstandingPoisha, 0);
-                          return (
-                            <tr key={t.id}>
-                              <td className="py-3 pr-3 font-semibold">
-                                {t.fullName}
-                              </td>
-                              <td className="py-3 px-3">{t.status}</td>
-                              <td className="py-3 px-3 text-right font-mono">
-                                {formatBDT(t.monthlyRentPoisha, lang)}
-                              </td>
-                              <td className="py-3 px-3 text-right font-mono">
-                                {formatBDT(dep.heldBalancePoisha, lang)}
-                              </td>
-                              <td className="py-3 px-3 text-right font-mono text-emerald-700">
-                                {formatBDT(t.advanceRentCreditPoisha, lang)}
-                              </td>
-                              <td className="py-3 pl-3 text-right font-mono font-bold text-red-600">
-                                {formatBDT(due, lang)}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-3 pr-3">{isBn ? 'ভাড়াটিয়া' : 'Tenant'}</th>
+                          <th className="py-3 px-3">{isBn ? 'অবস্থা' : 'Status'}</th>
+                          <th className="py-3 px-3 text-right">{isBn ? 'মাসিক ভাড়া' : 'Monthly Rent'}</th>
+                          <th className="py-3 px-3 text-right">{isBn ? 'জামানত' : 'Held Deposit'}</th>
+                          <th className="py-3 px-3 text-right">{isBn ? 'অগ্রিম জমা' : 'Advance Credit'}</th>
+                          <th className="py-3 pl-3 text-right">{isBn ? 'বর্তমান বকেয়া' : 'Current Due'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {db.tenants
+                          .filter(
+                            (t) =>
+                              reportTenantId === 'ALL' || t.id === reportTenantId
+                          )
+                          .map((t) => {
+                            const dep = calculateTenantDepositBalance(
+                              t.id,
+                              db.depositTransactions
+                            );
+                            const due = getTenantUnpaidObligations(
+                              t.id,
+                              db.rentCharges,
+                              db.utilityBills
+                            ).reduce((s, o) => s + o.outstandingPoisha, 0);
+                            return (
+                              <tr key={t.id} className="hover:bg-slate-50">
+                                <td className="py-3.5 pr-3 font-bold text-slate-900">
+                                  {t.fullName}
+                                </td>
+                                <td className="py-3.5 px-3">{t.status}</td>
+                                <td className="py-3.5 px-3 text-right font-mono">
+                                  {formatBDT(t.monthlyRentPoisha, lang)}
+                                </td>
+                                <td className="py-3.5 px-3 text-right font-mono">
+                                  {formatBDT(dep.heldBalancePoisha, lang)}
+                                </td>
+                                <td className="py-3.5 px-3 text-right font-mono text-emerald-700 font-bold">
+                                  {formatBDT(t.advanceRentCreditPoisha, lang)}
+                                </td>
+                                <td className="py-3.5 pl-3 text-right font-mono font-extrabold text-red-600">
+                                  {formatBDT(due, lang)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
               {reportType === 'OUTSTANDING_DUES' && (
-                <div className="space-y-3">
-                  <h2 className="text-base font-bold text-slate-900">
-                    {isBn ? 'বকেয়া ভাড়ার বিস্তারিত প্রতিবেদন' : 'Outstanding Dues Report'}
+                <div className="space-y-4">
+                  <h2 className="text-lg font-extrabold text-slate-900">
+                    {isBn ? 'বকেয়া ভাড়ার তালিকা' : 'Outstanding Dues List'}
                   </h2>
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2 pr-3">Tenant</th>
-                        <th className="py-2 px-3">Building & Unit</th>
-                        <th className="py-2 px-3">Overdue Billing Periods</th>
-                        <th className="py-2 pl-3 text-right">
-                          Total Outstanding
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {reminderEval?.overdueItems.map((item) => (
-                        <tr key={item.eventKey}>
-                          <td className="py-3 pr-3 font-semibold">
-                            {item.tenant.fullName} ({item.tenant.primaryPhone})
-                          </td>
-                          <td className="py-3 px-3">
-                            {item.building.name} · {item.unit.unitNumber}
-                          </td>
-                          <td className="py-3 px-3 font-mono">
-                            {item.overduePeriods.join(', ')}
-                          </td>
-                          <td className="py-3 pl-3 text-right font-mono font-bold text-red-600">
-                            {formatBDT(item.outstandingPoisha, lang)}
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-3 pr-3">{isBn ? 'ভাড়াটিয়া ও ফোন' : 'Tenant'}</th>
+                          <th className="py-3 px-3">{isBn ? 'ভবন ও ফ্ল্যাট' : 'Building & Flat'}</th>
+                          <th className="py-3 px-3">{isBn ? 'বকেয়া মাস' : 'Overdue Months'}</th>
+                          <th className="py-3 pl-3 text-right">{isBn ? 'মোট বকেয়া' : 'Total Due'}</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {reminderEval?.overdueItems.map((item) => (
+                          <tr key={item.eventKey} className="hover:bg-slate-50">
+                            <td className="py-3.5 pr-3 font-bold text-slate-900">
+                              {item.tenant.fullName} ({item.tenant.primaryPhone})
+                            </td>
+                            <td className="py-3.5 px-3">
+                              {item.building.name} · <strong>{item.unit.unitNumber}</strong>
+                            </td>
+                            <td className="py-3.5 px-3 font-mono">
+                              {item.overduePeriods.join(', ')}
+                            </td>
+                            <td className="py-3.5 pl-3 text-right font-mono font-extrabold text-red-600">
+                              {formatBDT(item.outstandingPoisha, lang)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
               {reportType === 'RENT_COLLECTION' && (
-                <div className="space-y-3">
-                  <h2 className="text-base font-bold text-slate-900">
-                    Rent Collection & Receipt Ledger
+                <div className="space-y-4">
+                  <h2 className="text-lg font-extrabold text-slate-900">
+                    {isBn ? 'ভাড়া আদায় ও রসিদ তালিকা' : 'Rent Collection & Receipt Ledger'}
                   </h2>
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2 pr-3">Receipt #</th>
-                        <th className="py-2 px-3">Date</th>
-                        <th className="py-2 px-3">Tenant</th>
-                        <th className="py-2 px-3">Method & Ref</th>
-                        <th className="py-2 pl-3 text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {db.payments.map((p) => {
-                        const t = db.tenants.find((x) => x.id === p.tenantId);
-                        return (
-                          <tr key={p.id}>
-                            <td className="py-2.5 pr-3 font-mono font-semibold">
-                              {p.receiptNumber}
-                            </td>
-                            <td className="py-2.5 px-3 font-mono">
-                              {p.paymentDate}
-                            </td>
-                            <td className="py-2.5 px-3">{t?.fullName}</td>
-                            <td className="py-2.5 px-3 font-mono">
-                              {p.method} {p.transactionRef}
-                            </td>
-                            <td className="py-2.5 pl-3 text-right font-mono font-bold text-emerald-700">
-                              {formatBDT(p.amountReceivedPoisha, lang)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-3 pr-3">{isBn ? 'রসিদ নং' : 'Receipt #'}</th>
+                          <th className="py-3 px-3">{isBn ? 'তারিখ' : 'Date'}</th>
+                          <th className="py-3 px-3">{isBn ? 'ভাড়াটিয়া' : 'Tenant'}</th>
+                          <th className="py-3 px-3">{isBn ? 'মাধ্যম' : 'Method'}</th>
+                          <th className="py-3 pl-3 text-right">{isBn ? 'টাকার পরিমাণ' : 'Amount'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {db.payments.map((p) => {
+                          const t = db.tenants.find((x) => x.id === p.tenantId);
+                          return (
+                            <tr key={p.id} className="hover:bg-slate-50">
+                              <td className="py-3 pr-3 font-mono font-bold">
+                                {p.receiptNumber}
+                              </td>
+                              <td className="py-3 px-3 font-mono">
+                                {p.paymentDate}
+                              </td>
+                              <td className="py-3 px-3 font-semibold">{t?.fullName}</td>
+                              <td className="py-3 px-3 font-mono">
+                                {p.method} {p.transactionRef}
+                              </td>
+                              <td className="py-3 pl-3 text-right font-mono font-extrabold text-emerald-700">
+                                {formatBDT(p.amountReceivedPoisha, lang)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
               {reportType === 'UTILITY_BILLING' && (
-                <div className="space-y-3">
-                  <h2 className="text-base font-bold text-slate-900">
-                    Utility Billing & Shared Charge Report
+                <div className="space-y-4">
+                  <h2 className="text-lg font-extrabold text-slate-900">
+                    {isBn ? 'ইউটিলিটি ও যৌথ বিল রিপোর্ট' : 'Utility Billing Report'}
                   </h2>
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2 pr-3">Period</th>
-                        <th className="py-2 px-3">Unit</th>
-                        <th className="py-2 px-3">Utility Type</th>
-                        <th className="py-2 px-3 text-right">Billed</th>
-                        <th className="py-2 pl-3 text-right">Paid</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {db.utilityBills.map((ub) => {
-                        const u = db.units.find((x) => x.id === ub.unitId);
-                        return (
-                          <tr key={ub.id}>
-                            <td className="py-2.5 pr-3 font-mono">
-                              {ub.billingPeriod}
-                            </td>
-                            <td className="py-2.5 px-3">{u?.unitNumber}</td>
-                            <td className="py-2.5 px-3">
-                              {ub.utilityType} ({ub.billingMode})
-                            </td>
-                            <td className="py-2.5 px-3 text-right font-mono">
-                              {formatBDT(ub.totalAmountPoisha, lang)}
-                            </td>
-                            <td className="py-2.5 pl-3 text-right font-mono text-emerald-700">
-                              {formatBDT(ub.paidAmountPoisha, lang)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-3 pr-3">{isBn ? 'মাস' : 'Period'}</th>
+                          <th className="py-3 px-3">{isBn ? 'ফ্ল্যাট' : 'Flat'}</th>
+                          <th className="py-3 px-3">{isBn ? 'বিলের ধরন' : 'Utility Type'}</th>
+                          <th className="py-3 px-3 text-right">{isBn ? 'মোট বিল' : 'Billed'}</th>
+                          <th className="py-3 pl-3 text-right">{isBn ? 'পরিশোধিত' : 'Paid'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {db.utilityBills.map((ub) => {
+                          const u = db.units.find((x) => x.id === ub.unitId);
+                          return (
+                            <tr key={ub.id} className="hover:bg-slate-50">
+                              <td className="py-3 pr-3 font-mono">
+                                {ub.billingPeriod}
+                              </td>
+                              <td className="py-3 px-3 font-bold">{u?.unitNumber}</td>
+                              <td className="py-3 px-3">
+                                {ub.utilityType} ({ub.billingMode})
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono">
+                                {formatBDT(ub.totalAmountPoisha, lang)}
+                              </td>
+                              <td className="py-3 pl-3 text-right font-mono text-emerald-700 font-bold">
+                                {formatBDT(ub.paidAmountPoisha, lang)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
               {reportType === 'EXPENSE_REPORT' && (
-                <div className="space-y-3">
-                  <h2 className="text-base font-bold text-slate-900">
-                    Property Expense Report
+                <div className="space-y-4">
+                  <h2 className="text-lg font-extrabold text-slate-900">
+                    {isBn ? 'ভবনের খরচ রিপোর্ট' : 'Property Expense Report'}
                   </h2>
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2 pr-3">Date</th>
-                        <th className="py-2 px-3">Category</th>
-                        <th className="py-2 px-3">Description & Vendor</th>
-                        <th className="py-2 pl-3 text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {db.expenses.map((e) => (
-                        <tr key={e.id}>
-                          <td className="py-2.5 pr-3 font-mono">{e.date}</td>
-                          <td className="py-2.5 px-3 font-semibold">
-                            {e.category}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            {e.description} ({e.vendor})
-                          </td>
-                          <td className="py-2.5 pl-3 text-right font-mono font-bold">
-                            {formatBDT(e.amountPoisha, lang)}
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-3 pr-3">{isBn ? 'তারিখ' : 'Date'}</th>
+                          <th className="py-3 px-3">{isBn ? 'খাত' : 'Category'}</th>
+                          <th className="py-3 px-3">{isBn ? 'বিবরণ' : 'Description'}</th>
+                          <th className="py-3 pl-3 text-right">{isBn ? 'পরিমাণ' : 'Amount'}</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {db.expenses.map((e) => (
+                          <tr key={e.id} className="hover:bg-slate-50">
+                            <td className="py-3 pr-3 font-mono">{e.date}</td>
+                            <td className="py-3 px-3 font-bold">
+                              {e.category}
+                            </td>
+                            <td className="py-3 px-3">
+                              {e.description} {e.vendor ? `(${e.vendor})` : ''}
+                            </td>
+                            <td className="py-3 pl-3 text-right font-mono font-extrabold">
+                              {formatBDT(e.amountPoisha, lang)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
               {reportType === 'SECURITY_DEPOSIT' && (
-                <div className="space-y-3">
-                  <h2 className="text-base font-bold text-slate-900">
-                    Security Deposit Reconciliation (Excluded from Rent Income)
+                <div className="space-y-4">
+                  <h2 className="text-lg font-extrabold text-slate-900">
+                    {isBn ? 'জামানত (Security Deposit) হিসাব' : 'Security Deposit Ledger'}
                   </h2>
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2 pr-3">Date</th>
-                        <th className="py-2 px-3">Tenant</th>
-                        <th className="py-2 px-3">Type</th>
-                        <th className="py-2 px-3">Reason</th>
-                        <th className="py-2 pl-3 text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {db.depositTransactions.map((dtx) => {
-                        const t = db.tenants.find((x) => x.id === dtx.tenantId);
-                        return (
-                          <tr key={dtx.id}>
-                            <td className="py-2.5 pr-3 font-mono">
-                              {dtx.date}
-                            </td>
-                            <td className="py-2.5 px-3 font-medium">
-                              {t?.fullName}
-                            </td>
-                            <td className="py-2.5 px-3 font-mono">
-                              {dtx.type}
-                            </td>
-                            <td className="py-2.5 px-3">{dtx.reason}</td>
-                            <td className="py-2.5 pl-3 text-right font-mono font-bold">
-                              {formatBDT(dtx.amountPoisha, lang)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-3 pr-3">{isBn ? 'তারিখ' : 'Date'}</th>
+                          <th className="py-3 px-3">{isBn ? 'ভাড়াটিয়া' : 'Tenant'}</th>
+                          <th className="py-3 px-3">{isBn ? 'ধরন' : 'Type'}</th>
+                          <th className="py-3 px-3">{isBn ? 'কারণ' : 'Reason'}</th>
+                          <th className="py-3 pl-3 text-right">{isBn ? 'পরিমাণ' : 'Amount'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {db.depositTransactions.map((dtx) => {
+                          const t = db.tenants.find((x) => x.id === dtx.tenantId);
+                          return (
+                            <tr key={dtx.id} className="hover:bg-slate-50">
+                              <td className="py-3 pr-3 font-mono">
+                                {dtx.date}
+                              </td>
+                              <td className="py-3 px-3 font-bold">
+                                {t?.fullName}
+                              </td>
+                              <td className="py-3 px-3 font-mono">
+                                {dtx.type}
+                              </td>
+                              <td className="py-3 px-3">{dtx.reason}</td>
+                              <td className="py-3 pl-3 text-right font-mono font-extrabold">
+                                {formatBDT(dtx.amountPoisha, lang)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
               {reportType === 'OCCUPANCY' && (
-                <div className="space-y-3">
-                  <h2 className="text-base font-bold text-slate-900">
-                    Unit Occupancy & Vacancy Report
+                <div className="space-y-4">
+                  <h2 className="text-lg font-extrabold text-slate-900">
+                    {isBn ? 'ফ্ল্যাট দখল ও খালি তালিকা' : 'Unit Occupancy & Vacancy Report'}
                   </h2>
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2 pr-3">Building</th>
-                        <th className="py-2 px-3">Unit</th>
-                        <th className="py-2 px-3">Status</th>
-                        <th className="py-2 px-3">Occupant</th>
-                        <th className="py-2 pl-3 text-right">Default Rent</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {db.units.map((u) => {
-                        const b = db.buildings.find(
-                          (x) => x.id === u.buildingId
-                        );
-                        const t = db.tenants.find(
-                          (x) => x.currentUnitId === u.id && x.status === 'ACTIVE'
-                        );
-                        return (
-                          <tr key={u.id}>
-                            <td className="py-2.5 pr-3">{b?.name}</td>
-                            <td className="py-2.5 px-3 font-bold">
-                              {u.unitNumber}
-                            </td>
-                            <td className="py-2.5 px-3 font-mono">
-                              {u.status}
-                            </td>
-                            <td className="py-2.5 px-3">
-                              {t ? t.fullName : '—'}
-                            </td>
-                            <td className="py-2.5 pl-3 text-right font-mono">
-                              {formatBDT(u.defaultRentPoisha, lang)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-3 pr-3">{isBn ? 'ভবন' : 'Building'}</th>
+                          <th className="py-3 px-3">{isBn ? 'ফ্ল্যাট' : 'Flat'}</th>
+                          <th className="py-3 px-3">{isBn ? 'অবস্থা' : 'Status'}</th>
+                          <th className="py-3 px-3">{isBn ? 'ভাড়াটিয়া' : 'Occupant'}</th>
+                          <th className="py-3 pl-3 text-right">{isBn ? 'নির্ধারিত ভাড়া' : 'Default Rent'}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {db.units.map((u) => {
+                          const b = db.buildings.find(
+                            (x) => x.id === u.buildingId
+                          );
+                          const t = db.tenants.find(
+                            (x) => x.currentUnitId === u.id && x.status === 'ACTIVE'
+                          );
+                          return (
+                            <tr key={u.id} className="hover:bg-slate-50">
+                              <td className="py-3 pr-3">{b?.name}</td>
+                              <td className="py-3 px-3 font-extrabold">
+                                {u.unitNumber}
+                              </td>
+                              <td className="py-3 px-3 font-mono">
+                                {u.status}
+                              </td>
+                              <td className="py-3 px-3 font-semibold">
+                                {t ? t.fullName : '—'}
+                              </td>
+                              <td className="py-3 pl-3 text-right font-mono font-bold">
+                                {formatBDT(u.defaultRentPoisha, lang)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
               {reportType === 'AUDIT_HISTORY' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-base font-bold text-slate-900">
-                      Immutable Transaction Audit History
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <h2 className="text-lg font-extrabold text-slate-900">
+                      {isBn ? 'সকল লেনদেনের অডিট ইতিহাস' : 'Immutable Transaction Audit History'}
                     </h2>
                     <select
                       value={auditTypeFilter}
                       onChange={(e) => setAuditTypeFilter(e.target.value)}
-                      className="rounded border border-slate-300 px-2.5 py-1 text-xs"
+                      className="rounded-xl border border-slate-300 px-3.5 py-2 text-sm font-semibold"
                     >
                       <option value="ALL">All Event Types</option>
                       <option value="PAYMENT_RECORDED">PAYMENT_RECORDED</option>
@@ -4667,7 +4876,7 @@ export function App() {
                       <option value="BACKUP_EXPORTED">BACKUP_EXPORTED</option>
                     </select>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     {db.auditLogs
                       .filter(
                         (a) =>
@@ -4677,10 +4886,10 @@ export function App() {
                       .map((log) => (
                         <div
                           key={log.id}
-                          className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                          className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm"
                         >
                           <div>
-                            <span className="font-mono font-semibold text-slate-900">
+                            <span className="font-mono font-extrabold text-slate-900">
                               {log.eventType}
                             </span>
                             <span aria-hidden="true"> · </span>
@@ -4688,7 +4897,7 @@ export function App() {
                               {isBn ? log.summaryBn : log.summaryEn}
                             </span>
                           </div>
-                          <div className="text-[11px] text-slate-500 font-mono whitespace-nowrap">
+                          <div className="text-xs text-slate-500 font-mono whitespace-nowrap">
                             {log.userName} · {log.timestamp.slice(0, 19)}
                           </div>
                         </div>
@@ -4703,39 +4912,44 @@ export function App() {
         {/* ==================== 8. SETTINGS, ROLES, SYNC & ENCRYPTED BACKUP ==================== */}
         {activeTab === 'SETTINGS' && (
           <div className="space-y-6">
-            <div className="border-b border-slate-200 pb-4">
-              <h1 className="text-xl font-bold text-slate-900">
+            <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm">
+              <h1 className="text-xl font-extrabold text-slate-900">
                 {isBn
-                  ? 'সেটিংস, অনুমতি, পিন নিরাপত্তা, সিঙ্ক এবং এনক্রিপ্টেড ব্যাকআপ'
-                  : 'Settings, Role Permissions, Security PIN, Sync & Encrypted Backup'}
+                  ? 'সেটিংস, পিন লক ও ব্যাকআপ'
+                  : 'Settings, PIN Security & Encrypted Backup'}
               </h1>
+              <p className="text-sm text-slate-500 mt-1">
+                {isBn
+                  ? 'আপনার অ্যাপের নাম, স্বাক্ষর, পিন লক এবং ডাটা ব্যাকআপ সহজে নিয়ন্ত্রণ করুন।'
+                  : 'Manage app branding, PIN lock, manager permissions, and encrypted backups.'}
+              </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* 1. Encrypted Backup & Restore (AES-256-GCM) */}
-              <div className="rounded-xl bg-white border border-slate-200 p-6 space-y-4">
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-emerald-600" />
+              <div className="rounded-3xl bg-white border border-slate-200/80 p-6 shadow-sm space-y-5">
+                <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-emerald-600" />
                   <span>
                     {isBn
-                      ? 'এনক্রিপ্টেড ব্যাকআপ ও রিস্টোর (AES-256-GCM)'
-                      : 'Authenticated Encrypted Backup & Restore (AES-256-GCM)'}
+                      ? 'নিরাপদ ব্যাকআপ ও রিস্টোর (AES-256)'
+                      : 'Encrypted Backup & Restore (AES-256)'}
                   </span>
                 </h2>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm text-slate-500">
                   {isBn
-                    ? 'PBKDF2 (১২০,০০০ ইটারেশন) এবং র‍্যান্ডম ১২-বাইট নন্স (Nonce) সহ AES-256-GCM এনক্রিপশন। ভুল পাসওয়ার্ড বা ফাইল বিকৃত হলে রিস্টোর স্বয়ংক্রিয়ভাবে প্রতিরোধ করা হয়।'
-                    : 'Protected with PBKDF2-HMAC-SHA256 (120,000 iterations), unique 96-bit cryptographic nonce, and SHA-256 state checksum.'}
+                    ? 'ফোন পরিবর্তন বা হারানোর ঝুঁকি এড়াতে পাসওয়ার্ড দিয়ে ব্যাকআপ ফাইল ডাউনলোড করে রাখুন।'
+                    : 'Protect your ledger with a password-encrypted backup file.'}
                 </p>
 
                 <form
                   onSubmit={handleExportEncryptedBackup}
-                  className="space-y-3 pt-2 border-t border-slate-100 text-xs"
+                  className="space-y-3 pt-3 border-t border-slate-100 text-sm"
                 >
-                  <div className="font-semibold text-slate-800">
+                  <div className="font-bold text-slate-800">
                     {isBn
-                      ? '১. এনক্রিপ্টেড ব্যাকআপ ফাইল তৈরি করুন'
-                      : '1. Create Encrypted Backup (.brmbackup)'}
+                      ? '১. ব্যাকআপ ফাইল ডাউনলোড করুন'
+                      : '1. Download Encrypted Backup (.brmbackup)'}
                   </div>
                   <input
                     type="password"
@@ -4743,175 +4957,188 @@ export function App() {
                     minLength={4}
                     placeholder={
                       isBn
-                        ? 'ব্যাকআপ পাসওয়ার্ড দিন (কমপক্ষে ৪ অক্ষর)'
+                        ? 'গোপন পাসওয়ার্ড দিন (কমপক্ষে ৪ অক্ষর)'
                         : 'Enter encryption password (min 4 chars)'
                     }
                     value={backupPassword}
                     onChange={(e) => setBackupPassword(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
                   />
-                  <label className="flex items-center gap-2 text-slate-600">
+                  <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={includeBackupDocs}
                       onChange={(e) => setIncludeBackupDocs(e.target.checked)}
+                      className="rounded"
                     />
                     <span>
                       {isBn
-                        ? 'ভাড়াটিয়ার ছবি ও চুক্তিপত্র ফাইলগুলো ব্যাকআপে অন্তর্ভুক্ত করুন'
-                        : 'Include locally attached tenant photos & agreement files'}
+                        ? 'ভাড়াটিয়ার ছবি ও চুক্তিপত্র ফাইলগুলো ব্যাকআপে যুক্ত করুন'
+                        : 'Include attached tenant photos & agreement files'}
                     </span>
                   </label>
                   <button
                     type="submit"
-                    className="w-full py-2 px-4 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 flex items-center justify-center gap-1.5"
+                    className="w-full py-3 px-4 rounded-2xl bg-slate-900 text-white font-bold hover:bg-slate-800 flex items-center justify-center gap-2"
                   >
                     <Download className="w-4 h-4" />
                     <span>
                       {isBn
-                        ? 'এনক্রিপ্টেড ব্যাকআপ ডাউনলোড করুন'
-                        : 'Export Encrypted Backup'}
+                        ? 'ব্যাকআপ ডাউনলোড করুন'
+                        : 'Download Encrypted Backup'}
                     </span>
                   </button>
                 </form>
 
                 <form
                   onSubmit={handleRestoreEncryptedBackup}
-                  className="space-y-3 pt-4 border-t border-slate-200 text-xs"
+                  className="space-y-3 pt-4 border-t border-slate-200 text-sm"
                 >
-                  <div className="font-semibold text-slate-800">
+                  <div className="font-bold text-slate-800">
                     {isBn
-                      ? '২. ব্যাকআপ ফাইল হতে রিস্টোর করুন'
-                      : '2. Restore from Encrypted Backup'}
+                      ? '২. পুরাতন ব্যাকআপ ফাইল রিস্টোর করুন'
+                      : '2. Restore from Backup File'}
                   </div>
                   <input
                     type="file"
                     accept=".brmbackup,.json"
                     onChange={(e) => handleSelectRestoreFile(e.target.files?.[0])}
-                    className="w-full text-xs text-slate-600"
+                    className="w-full text-sm text-slate-600"
                   />
                   {restorePreviewSummary && (
-                    <div className="p-2.5 rounded bg-emerald-50 border border-emerald-200 text-[11px] font-mono text-emerald-900">
+                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs font-mono text-emerald-900">
                       {restorePreviewSummary}
                     </div>
                   )}
                   <input
                     type="password"
                     placeholder={
-                      isBn ? 'ডিক্রিপশন পাসওয়ার্ড দিন' : 'Enter backup password to decrypt'
+                      isBn ? 'ব্যাকআপের পাসওয়ার্ড দিন' : 'Enter backup password'
                     }
                     value={restorePassword}
                     onChange={(e) => setRestorePassword(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5"
                   />
                   <button
                     type="submit"
-                    className="w-full py-2 px-4 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 flex items-center justify-center gap-1.5"
+                    className="w-full py-3 px-4 rounded-2xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 flex items-center justify-center gap-2"
                   >
                     <Upload className="w-4 h-4" />
                     <span>
                       {isBn
-                        ? 'যাচাই ও রিস্টোর করুন (বিদ্যমান ডাটা প্রতিস্থাপিত হবে)'
-                        : 'Verify Integrity & Restore Backup'}
+                        ? 'যাচাই ও রিস্টোর করুন'
+                        : 'Verify & Restore Backup'}
                     </span>
                   </button>
                 </form>
               </div>
 
-              {/* 2. Role Permissions (Owner vs Manager) */}
-              <div className="rounded-xl bg-white border border-slate-200 p-6 space-y-4">
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-emerald-600" />
-                  <span>
-                    {isBn
-                      ? 'ম্যানেজার/কেয়ারটেকারের অনুমতি নিয়ন্ত্রণ'
-                      : 'Property Manager Granular Permissions'}
-                  </span>
-                </h2>
-                <p className="text-xs text-slate-500">
-                  {isBn
-                    ? 'বাড়িওয়ালা (Owner) ম্যানেজারের জন্য কোন কোন কাজ অনুমোদিত তা নির্ধারণ করতে পারেন।'
-                    : 'Configure which actions the Property Manager profile is authorized to perform on this device.'}
-                </p>
-
-                {db.users
-                  .filter((u) => u.role === 'MANAGER')
-                  .map((mgr) => (
-                    <div key={mgr.id} className="space-y-2 text-xs">
-                      <div className="font-semibold text-slate-800">
-                        {mgr.name} ({mgr.phone})
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {(
-                          Object.keys(mgr.permissions) as (keyof UserPermission)[]
-                        ).map((permKey) => (
-                          <label
-                            key={permKey}
-                            className="flex items-center gap-2 p-2 rounded border border-slate-200 bg-slate-50"
-                          >
-                            <input
-                              type="checkbox"
-                              disabled={activeUser.role !== 'OWNER'}
-                              checked={mgr.permissions[permKey]}
-                              onChange={(e) =>
-                                commitDb(
-                                  (d) => {
-                                    const m = d.users.find(
-                                      (x) => x.id === mgr.id
-                                    );
-                                    if (m)
-                                      m.permissions[permKey] =
-                                        e.target.checked;
-                                    return d;
-                                  },
-                                  {
-                                    eventType: 'USER_PERMISSION_CHANGED',
-                                    entityId: mgr.id,
-                                    summaryEn: `Updated Manager permission ${permKey} = ${String(e.target.checked)}.`,
-                                    summaryBn: `ম্যানেজারের অনুমতি (${permKey}) পরিবর্তন করা হয়েছে।`,
-                                  }
-                                )
-                              }
-                            />
-                            <span className="font-mono text-slate-700">
-                              {permKey}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-
-                {/* App Security PIN Configuration */}
-                <div className="pt-4 border-t border-slate-200 space-y-3 text-xs">
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <Lock className="w-4 h-4 text-emerald-600" />
+              {/* 2. Branding, PIN Lock & Permissions */}
+              <div className="space-y-6">
+                <div className="rounded-3xl bg-white border border-slate-200/80 p-6 shadow-sm space-y-4 text-sm">
+                  <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+                    <Settings className="w-5 h-5 text-emerald-600" />
                     <span>
                       {isBn
-                        ? 'অ্যাপ পিন লক ও বায়োমেট্রিক নিরাপত্তা'
-                        : 'App PIN Lock & Biometric Protection'}
+                        ? 'অ্যাপের নাম, স্বাক্ষর ও ভাড়ার নিয়ম'
+                        : 'App Name, Signature & Rent Rules'}
+                    </span>
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        {isBn ? 'অ্যাপ/বাড়ির নাম' : 'App / Property Name'}
+                      </label>
+                      <input
+                        type="text"
+                        value={db.settings.appName}
+                        onChange={(e) =>
+                          commitDb((d) => {
+                            d.settings.appName = e.target.value;
+                            return d;
+                          })
+                        }
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">
+                        {isBn ? 'মালিকের নাম ও স্বাক্ষর' : 'Owner Signature'}
+                      </label>
+                      <input
+                        type="text"
+                        value={db.settings.ownerSignature}
+                        onChange={(e) =>
+                          commitDb((d) => {
+                            d.settings.ownerSignature = e.target.value;
+                            return d;
+                          })
+                        }
+                        className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      {isBn
+                        ? 'মাসের মাঝামাঝি উঠলে ভাড়ার নিয়ম'
+                        : 'Partial-Month Occupancy Rule'}
+                    </label>
+                    <select
+                      value={db.settings.prorationPolicy}
+                      onChange={(e) =>
+                        commitDb((d) => {
+                          d.settings.prorationPolicy = e.target
+                            .value as ProrationPolicy;
+                          return d;
+                        })
+                      }
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-semibold"
+                    >
+                      <option value="DAILY_30">
+                        ৩০ দিনের আনুপাতিক হিসাব (Pro-rata 30-Day)
+                      </option>
+                      <option value="ACTUAL_DAYS">
+                        ক্যালেন্ডার মাসের প্রকৃত দিন অনুযায়ী
+                      </option>
+                      <option value="FULL_MONTH">
+                        পূর্ণ মাসের ভাড়া (Full Month)
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* App Security PIN Configuration */}
+                <div className="rounded-3xl bg-white border border-slate-200/80 p-6 shadow-sm space-y-4 text-sm">
+                  <div className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
+                    <Lock className="w-5 h-5 text-emerald-600" />
+                    <span>
+                      {isBn
+                        ? 'অ্যাপ পিন লক নিরাপত্তা'
+                        : 'App PIN Lock Protection'}
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2.5">
                     <select
                       value={newPinLen}
                       onChange={(e) =>
                         setNewPinLen(Number(e.target.value) as 4 | 6)
                       }
-                      className="rounded border border-slate-300 px-2.5 py-2"
+                      className="rounded-xl border border-slate-300 px-3 py-2.5 font-semibold"
                     >
-                      <option value={4}>4-Digit PIN</option>
-                      <option value={6}>6-Digit PIN</option>
+                      <option value={4}>৪ সংখ্যার পিন (4-Digit)</option>
+                      <option value={6}>৬ সংখ্যার পিন (6-Digit)</option>
                     </select>
                     <input
                       type="password"
                       maxLength={newPinLen}
-                      placeholder={`Enter ${newPinLen}-digit PIN`}
+                      placeholder={`${newPinLen} সংখ্যার পিন`}
                       value={newPinInput}
                       onChange={(e) =>
                         setNewPinInput(e.target.value.replace(/[^0-9]/g, ''))
                       }
-                      className="rounded border border-slate-300 px-3 py-2 font-mono w-36"
+                      className="rounded-xl border border-slate-300 px-3.5 py-2.5 font-mono w-36 font-bold"
                     />
                     <button
                       type="button"
@@ -4933,7 +5160,7 @@ export function App() {
                         setNewPinInput('');
                         notify('PIN Lock enabled.');
                       }}
-                      className="px-3 py-2 rounded bg-slate-900 text-white font-semibold"
+                      className="px-4 py-2.5 rounded-xl bg-slate-900 text-white font-bold"
                     >
                       {isBn ? 'পিন চালু করুন' : 'Enable PIN'}
                     </button>
@@ -4942,7 +5169,7 @@ export function App() {
                         <button
                           type="button"
                           onClick={() => setIsLocked(true)}
-                          className="px-3 py-2 rounded bg-emerald-600 text-white font-semibold"
+                          className="px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-bold"
                         >
                           {isBn ? 'এখনই লক করুন' : 'Lock Now'}
                         </button>
@@ -4955,243 +5182,168 @@ export function App() {
                               return d;
                             })
                           }
-                          className="px-3 py-2 rounded bg-red-50 text-red-700 font-semibold"
+                          className="px-4 py-2.5 rounded-xl bg-red-50 text-red-700 font-bold"
                         >
-                          {isBn ? 'পিন বন্ধ' : 'Disable PIN'}
+                          {isBn ? 'পিন বন্ধ করুন' : 'Disable PIN'}
                         </button>
                       </>
                     )}
                   </div>
-                </div>
-              </div>
 
-              {/* 3. Application Branding, Proration & Reminder Settings */}
-              <div className="rounded-xl bg-white border border-slate-200 p-6 space-y-3 text-xs">
-                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Settings className="w-4 h-4 text-emerald-600" />
-                  <span>
-                    {isBn
-                      ? 'রসিদ ব্র্যান্ডিং, ভাড়া হিসাব ও রিমাইন্ডার সেটিংস'
-                      : 'Receipt Branding, Proration Rule & Reminder Dates'}
-                  </span>
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'অ্যাপের নাম (Configurable App Name)' : 'Application Name'}
-                    </label>
-                    <input
-                      type="text"
-                      value={db.settings.appName}
-                      onChange={(e) =>
-                        commitDb((d) => {
-                          d.settings.appName = e.target.value;
-                          return d;
-                        })
-                      }
-                      className="w-full rounded border border-slate-300 px-3 py-2"
-                    />
+                  {/* Clean / Demo DB Reset */}
+                  <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const clean = createCleanDatabaseState();
+                        setDb(clean);
+                        await saveDatabaseState(clean);
+                        notify(
+                          isBn
+                            ? 'খালি নতুন ডাটাবেস চালু করা হয়েছে।'
+                            : 'Switched to a clean production database.'
+                        );
+                      }}
+                      className="px-4 py-2.5 rounded-xl border border-red-300 text-red-700 text-xs font-bold hover:bg-red-50"
+                    >
+                      {isBn
+                        ? 'ডেমো মুছে নতুন খালি হিসাব শুরু করুন'
+                        : 'Clear Demo & Start Blank Database'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const demo = createDemoDatabaseState();
+                        setDb(demo);
+                        await saveDatabaseState(demo);
+                        notify(
+                          isBn
+                            ? 'ডেমো ডাটা পুনরায় লোড হয়েছে।'
+                            : 'Reloaded sample dataset.'
+                        );
+                      }}
+                      className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-100"
+                    >
+                      {isBn ? 'ডেমো ডাটা রিসেট করুন' : 'Reset Demo Data'}
+                    </button>
                   </div>
-                  <div>
-                    <label className="block font-medium text-slate-700 mb-1">
-                      {isBn ? 'মালিকের নাম ও স্বাক্ষর' : 'Owner Name / Receipt Signature'}
-                    </label>
-                    <input
-                      type="text"
-                      value={db.settings.ownerSignature}
-                      onChange={(e) =>
-                        commitDb((d) => {
-                          d.settings.ownerSignature = e.target.value;
-                          return d;
-                        })
-                      }
-                      className="w-full rounded border border-slate-300 px-3 py-2"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    {isBn
-                      ? 'আংশিক মাসের ভাড়ার নিয়ম (Partial-Month Proration Rule)'
-                      : 'Partial-Month Occupancy Rule'}
-                  </label>
-                  <select
-                    value={db.settings.prorationPolicy}
-                    onChange={(e) =>
-                      commitDb((d) => {
-                        d.settings.prorationPolicy = e.target
-                          .value as ProrationPolicy;
-                        return d;
-                      })
-                    }
-                    className="w-full rounded border border-slate-300 px-3 py-2"
-                  >
-                    <option value="DAILY_30">
-                      Pro-rata 30-Day Standard (occupiedDays / 30)
-                    </option>
-                    <option value="ACTUAL_DAYS">
-                      Exact Calendar Days in Month (occupiedDays / daysInMonth)
-                    </option>
-                    <option value="FULL_MONTH">
-                      Full Month Rent (No Proration)
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    {isBn
-                      ? 'মাসিক রিমাইন্ডার তারিখ (ডিফল্ট: ৫, ১০, ১৫)'
-                      : 'Monthly Reminder Dates (Default: 5, 10, 15)'}
-                  </label>
-                  <input
-                    type="text"
-                    value={db.reminderSettings.reminderDays.join(', ')}
-                    onChange={(e) => {
-                      const days = e.target.value
-                        .split(',')
-                        .map((x) => parseInt(x.trim(), 10))
-                        .filter((n) => !Number.isNaN(n) && n >= 1 && n <= 28);
-                      if (days.length > 0) {
-                        commitDb((d) => {
-                          d.reminderSettings.reminderDays = days;
-                          return d;
-                        });
-                      }
-                    }}
-                    className="w-full rounded border border-slate-300 px-3 py-2 font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* 4. Multi-Device Cloud Sync & Database Reset */}
-              <div className="rounded-xl bg-white border border-slate-200 p-6 space-y-4 text-xs">
-                <h2 className="text-base font-bold text-slate-900">
-                  {isBn
-                    ? 'মাল্টি-ডিভাইস সিঙ্ক্রোনাইজেশন ও ডাটাবেস মোড'
-                    : 'Multi-Device Synchronization & Demo/Clean Mode'}
-                </h2>
-                <p className="text-slate-500">
-                  {isBn
-                    ? 'অ্যাপটি অফলাইনে সম্পূর্ণ স্বয়ংসম্পূর্ণ। একাধিক ফোনে সিঙ্ক করতে চাইলে আপনার অনুমোদিত ক্লাউড এন্ডপয়েন্ট (Supabase / HTTPS) যুক্ত করুন।'
-                    : 'Local SQLite/IndexedDB works 100% offline. For multi-phone synchronization, configure an authenticated HTTPS/Supabase sync endpoint below (idempotent merge prevents duplicate payments).'}
-                </p>
-
-                <div className="space-y-2">
-                  <input
-                    type="url"
-                    placeholder="https://your-project.supabase.co/rest/v1/ledger_sync"
-                    value={db.syncMetadata.endpointUrl}
-                    onChange={(e) =>
-                      commitDb((d) => {
-                        d.syncMetadata.endpointUrl = e.target.value;
-                        return d;
-                      })
-                    }
-                    className="w-full rounded border border-slate-300 px-3 py-2 font-mono"
-                  />
-                  <div className="flex items-center justify-between text-slate-500 font-mono">
-                    <span>Device ID: {db.syncMetadata.deviceId}</span>
-                    <span>
-                      Last Sync:{' '}
-                      {db.syncMetadata.lastSyncedAt
-                        ? db.syncMetadata.lastSyncedAt.slice(0, 19)
-                        : 'Offline Local Mode'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const res = mergeStatesIdempotently(db, db);
-                      await commitDb((d) => {
-                        d.syncMetadata.lastSyncedAt = new Date().toISOString();
-                        return d;
-                      });
-                      notify(
-                        `Verified idempotent sync engine (0 duplicate payments, ${res.conflictsDetected.length} conflicts).`
-                      );
-                    }}
-                    className="px-3.5 py-2 rounded bg-slate-900 text-white font-semibold hover:bg-slate-800"
-                  >
-                    {isBn
-                      ? 'সিঙ্ক ইঞ্জিন যাচাই করুন'
-                      : 'Verify Idempotent Sync Engine'}
-                  </button>
-                </div>
-
-                <div className="pt-4 border-t border-slate-200 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const clean = createCleanDatabaseState();
-                      setDb(clean);
-                      await saveDatabaseState(clean);
-                      notify(
-                        isBn
-                          ? 'খালি প্রোডাকশন ডাটাবেস চালু করা হয়েছে।'
-                          : 'Switched to a clean, empty production database.'
-                      );
-                    }}
-                    className="px-3.5 py-2 rounded border border-red-300 text-red-700 font-semibold hover:bg-red-50"
-                  >
-                    {isBn
-                      ? 'ডেমো মুছে খালি ডাটাবেস শুরু করুন (Start Clean DB)'
-                      : 'Clear Demo Data & Start Blank Production Ledger'}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const demo = createDemoDatabaseState();
-                      setDb(demo);
-                      await saveDatabaseState(demo);
-                      notify(
-                        isBn
-                          ? 'ডেমো ডাটা পুনরায় লোড হয়েছে।'
-                          : 'Reloaded sample Dhaka property dataset.'
-                      );
-                    }}
-                    className="px-3.5 py-2 rounded border border-slate-300 text-slate-700 font-semibold hover:bg-slate-100"
-                  >
-                    {isBn ? 'ডেমো ডাটা রিসেট করুন' : 'Reset Sample Demo Data'}
-                  </button>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* ==================== 9. ANDROID APK & NATIVE SOURCE CENTER ==================== */}
-        {activeTab === 'ANDROID_APK' && (
+        {/* ==================== 9. ANDROID APK & NATIVE SOURCE CENTER (Web Version Only) ==================== */}
+        {activeTab === 'ANDROID_APK' && !isApkVersion && (
           <AndroidDeliveryView lang={lang} testsPassedCount={26} />
         )}
-      </main>
+        </main>
+      </div>
 
-      {/* Mobile Fixed Bottom Navigation Bar (Natural Thumb Zone, <15% viewport height) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 grid grid-cols-5 items-center h-14 no-print">
+      {/* Mobile Slide-Up Full Menu Sheet */}
+      {showMobileMenu && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end justify-center no-print"
+          onClick={() => setShowMobileMenu(false)}
+        >
+          <div
+            className="bg-white w-full rounded-t-3xl p-6 space-y-4 max-h-[82vh] overflow-y-auto animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  {isBn ? 'সকল মেনু ও অপশন' : 'All Menu Options'}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {db.settings.appName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMobileMenu(false)}
+                className="p-2 rounded-xl bg-slate-100 text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              {navItems.map(([key, label, Icon]) => {
+                const active = activeTab === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(key);
+                      setShowMobileMenu(false);
+                    }}
+                    className={`flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all ${
+                      active
+                        ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-sm'
+                        : 'bg-slate-50 text-slate-800 border-slate-200/80 font-semibold hover:bg-slate-100'
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 shrink-0 ${active ? 'text-white' : 'text-emerald-600'}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs truncate">{label}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Fixed Bottom Navigation Bar (Clean 5-Tab Bar with "আরও / মেনু" Drawer) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 grid grid-cols-5 items-center h-16 px-1 no-print shadow-lg">
         {(
           [
-            ['DASHBOARD', isBn ? 'ড্যাশবোর্ড' : 'Home', Wallet],
-            ['BUILDINGS', isBn ? 'ভবন' : 'Buildings', Building2],
+            ['DASHBOARD', isBn ? 'হোম' : 'Home', Wallet],
+            ['COLLECTION', isBn ? 'ভাড়া আদায়' : 'Collect', CreditCard],
+            ['BUILDINGS', isBn ? 'ফ্ল্যাট' : 'Flats', Building2],
             ['TENANTS', isBn ? 'ভাড়াটিয়া' : 'Tenants', Users],
-            ['COLLECTION', isBn ? 'আদায়' : 'Collect', CreditCard],
-            ['SETTINGS', isBn ? 'মেনু/APK' : 'Settings', Settings],
           ] as const
-        ).map(([tabKey, label, Icon]) => (
-          <button
-            key={tabKey}
-            onClick={() => setActiveTab(tabKey)}
-            className={`flex flex-col items-center justify-center h-full ${
-              activeTab === tabKey
-                ? 'text-emerald-600 font-semibold'
-                : 'text-slate-500'
-            }`}
-          >
-            <Icon className="w-4 h-4" />
-            <span className="text-[10px] mt-0.5">{label}</span>
-          </button>
-        ))}
+        ).map(([tabKey, label, Icon]) => {
+          const active = activeTab === tabKey && !showMobileMenu;
+          return (
+            <button
+              key={tabKey}
+              type="button"
+              onClick={() => {
+                setShowMobileMenu(false);
+                setActiveTab(tabKey);
+              }}
+              className={`flex flex-col items-center justify-center h-full transition-colors ${
+                active
+                  ? 'text-emerald-600 font-extrabold'
+                  : 'text-slate-500 hover:text-slate-900 font-medium'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              <span className="text-[11px] mt-1 whitespace-nowrap">{label}</span>
+            </button>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => setShowMobileMenu((prev) => !prev)}
+          className={`flex flex-col items-center justify-center h-full transition-colors ${
+            showMobileMenu ||
+            ['BILLS', 'EXPENSES', 'REPORTS', 'SETTINGS', 'ANDROID_APK'].includes(activeTab)
+              ? 'text-emerald-600 font-extrabold'
+              : 'text-slate-500 hover:text-slate-900 font-medium'
+          }`}
+        >
+          <Settings className="w-5 h-5" />
+          <span className="text-[11px] mt-1 whitespace-nowrap">
+            {isBn ? 'মেনু / আরও' : 'More Menu'}
+          </span>
+        </button>
       </nav>
 
       {/* Official Receipt Preview, PDF, PNG & Share Modal */}
