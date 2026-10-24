@@ -1,0 +1,6 @@
+{
+  "name": "BashaRent Manager",
+  "description": "Offline-first Bangladesh property, flat, tenant, rent collection, utility billing, and financial ledger management application in Bengali & English (BDT).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,981 @@
+# MASTER IMPLEMENTATION PROMPT: OFFLINE-FIRST RENT & PROPERTY MANAGEMENT ANDROID APP
+
+## 1. Your Role and Mission
+
+Act as a senior Android application developer, software architect, database engineer, UI/UX designer, QA engineer, and Android build engineer.
+
+Your mission is to DESIGN, IMPLEMENT, TEST, BUILD, AND DELIVER a complete, working, installable Android APK for a personal property and rent management application.
+
+The application will be used in Bangladesh by property owners and their managers to manage multiple buildings, floors, rental units, tenants, rent collection, outstanding dues, utility bills, deposits, property expenses, receipts, and financial reports.
+
+**The primary deliverable is a real, installable APK file, not merely source code, a UI prototype, or a tutorial.**
+
+The user has a Windows PC but does not have an Android build environment installed and does not want to set up Android development tools manually. You must do as much of the development and building work as your actual tools and environment permit.
+
+Start by inspecting your available coding tools, terminal, filesystem, and build environment. Select a feasible implementation and APK build strategy. Do not assume that you have access to a terminal, Android SDK, cloud builder, or file attachment capability unless it is actually available.
+
+Do not stop after creating a plan. Proceed with implementation, testing, and building the deliverables whenever your environment allows.
+
+## 2. Application Overview
+
+Working application name: **BashaRent Manager**
+
+The app name should be configurable in the project and easy to change later.
+
+Primary requirements:
+
+- Android mobile application.
+- Offline-first operation.
+- Bengali and English interfaces.
+- Bangladesh currency: Bangladeshi Taka (BDT).
+- Support multiple buildings, floors, rental units, and tenants.
+- Support property owners and managers.
+- Local SQLite database.
+- Optional cloud synchronization across multiple phones.
+- Encrypted backup and restore.
+- PDF and image receipts that can be shared.
+- Monthly rent reminders.
+- Financial dashboards, reports, and charts.
+- Secure handling of tenant photographs, NID documents, and agreements.
+- Reliable financial calculations and transaction history.
+
+Target an Android version compatible with a broad range of currently supported devices. Choose a reasonable minimum SDK based on the actual libraries and build environment, document the choice, and test the resulting APK when possible.
+
+The initial release must work without requiring an account on a third-party cloud service.
+
+## 3. Technology and Build Strategy
+
+Prefer a native Android application using:
+
+- Kotlin.
+- Jetpack Compose for the user interface.
+- Material 3 design.
+- Room over SQLite for structured local persistence.
+- Kotlin Coroutines and Flow where appropriate.
+- Android WorkManager for scheduled background work.
+- Android notification APIs for reminders.
+- Android Keystore for protecting encryption keys where appropriate.
+- Android Storage Access Framework and FileProvider for safe file handling and sharing.
+- A suitable PDF generation library or Android's native PDF APIs.
+- A maintained chart library or custom Compose charts.
+
+Use stable, compatible dependencies and a Gradle version supported by the selected Android Gradle Plugin and JDK.
+
+You may select another technology only if it materially improves the ability to deliver a working Android APK within your available environment. Explain the trade-offs briefly.
+
+### Build strategy
+
+1. Inspect the actual environment before choosing the build method.
+2. If Android SDK, Gradle, JDK, and required dependencies are available, build the APK directly.
+3. If the local environment is missing Android tooling but a suitable cloud build service or coding environment is genuinely available, use that environment to compile the application.
+4. If no direct build route is available, create a complete Android project and a practical automated build configuration, such as a GitHub Actions workflow, that can produce the APK. Explain exactly what external action is still required.
+5. Do not claim that a remote build, repository upload, or APK download succeeded unless it actually succeeded.
+6. Do not expose credentials, API keys, signing keys, or other secrets in source code or logs.
+
+If the available environment supports producing downloadable artifacts, provide the actual APK as an attachment or verified download link. Do not provide a fabricated download link.
+
+## 4. User Roles and Permissions
+
+Implement two application roles:
+
+### Property Owner
+
+The owner can:
+
+- Create and manage multiple buildings.
+- Add floors and rental units.
+- Register and manage tenants.
+- Set rent, utility rates, service charges, deposits, and due-date policies.
+- Record and review payments.
+- Manage expenses.
+- View all financial reports.
+- Manage users and permissions.
+- Export and restore data.
+- Review transaction audit history.
+- Configure reminders, language, security, and backup.
+- Archive tenants and authorize permanent deletion where appropriate.
+
+### Property Manager
+
+The owner can grant the manager appropriate permissions.
+
+Support configurable permissions for:
+
+- Viewing buildings and units.
+- Registering and updating tenants.
+- Recording rent payments.
+- Entering utility readings and bills.
+- Recording expenses.
+- Generating and sharing receipts.
+- Viewing financial reports.
+- Managing tenant documents.
+- Editing settings.
+- Managing users.
+
+Provide a simple permission interface. The initial setup may use a single local owner profile, with the ability to add a manager profile on the same device.
+
+Important: separate profiles on one phone do not provide cross-device synchronization. Implement a clear account and device model for synchronization rather than pretending that a local profile automatically exists on other devices.
+
+For multiple phones, use a proper authentication and synchronization service with authorization enforced on the server.
+
+## 5. Buildings, Floors, Units, and Tenants
+
+Implement this hierarchy:
+
+Building → Floor → Rental Unit → Tenant Occupancy.
+
+Allow the owner to add buildings in the future without a fixed limit imposed by the interface.
+
+Each building should include:
+
+- Building name.
+- Address.
+- Optional notes.
+- Optional photograph.
+- Building status.
+- Creation date.
+
+Each floor should include:
+
+- Floor name or number.
+- Building association.
+- Notes.
+
+Each rental unit should include:
+
+- Unit or flat number.
+- Floor and building association.
+- Unit type.
+- Bedrooms or other optional attributes.
+- Default monthly rent.
+- Service charge.
+- Unit status: vacant, occupied, maintenance, or unavailable.
+- Notes.
+
+Support approximately 5–20 rental units initially, but do not hard-code a maximum of 20.
+
+### Tenant profile
+
+Store relevant tenant information:
+
+- Full name.
+- Photograph.
+- Primary phone number.
+- Optional alternative phone number.
+- NID number and optional NID photograph or scan.
+- Present address.
+- Permanent address.
+- Occupation.
+- Emergency contact.
+- Optional family member information.
+- Move-in date.
+- Lease start and end dates.
+- Monthly rent.
+- Payment due date.
+- Security deposit.
+- Advance rent.
+- Tenant status.
+- Optional signed rental agreement PDF or image.
+- Notes.
+
+Treat NID documents, photographs, addresses, and other personal information as sensitive data.
+
+Never share sensitive tenant documents automatically when generating receipts or messages.
+
+Validate required fields and provide clear Bengali and English validation messages.
+
+Allow tenants to be archived when they move out. Preserve their historical payments, receipts, bills, and outstanding balances.
+
+Permanent deletion should require owner authorization and a clear confirmation. Protect financial records from accidental deletion and explain any retention constraints.
+
+## 6. Rent and Billing Rules
+
+Implement financial calculations carefully and document them.
+
+### Monthly rent generation
+
+- Generate rent charges for each active tenant's occupied unit on the first day of each calendar month.
+- Use the local Bangladesh timezone, Asia/Dhaka.
+- Generate each monthly charge only once.
+- Reopening the app or repeating a background job must never duplicate a charge.
+- Allow the owner to modify the rent amount for a particular month.
+- Preserve historical charges when the tenant's future rent changes.
+- Do not generate rent for periods outside the tenant's applicable occupancy dates.
+- Handle partial-month occupancy using a clearly documented rule, preferably configurable by the owner.
+- Do not create charges for archived tenants after their occupancy ends.
+
+Each charge should be traceable to a building, unit, tenant, billing period, and charge category.
+
+### Due date
+
+The default policy is that monthly rent is generated on the first day of the month.
+
+Use the first day as the initial due date, but allow the owner to configure a due date for each building or tenant.
+
+Make it clear that the due date is configurable and that the monthly reminder dates are separate settings.
+
+### Partial payments and outstanding dues
+
+Support:
+
+- Full payment.
+- Partial payment.
+- Multiple payments against one monthly charge.
+- Payments covering more than one billing period.
+- Owner-selected allocation of a payment to particular months.
+- An option to allocate payments to the oldest outstanding charge first.
+- A clear outstanding balance for every billing period.
+- Historical unpaid balances carried forward without duplication.
+- Overpayments shown as an unallocated credit or advance until explicitly allocated.
+
+Never silently discard or double-count a payment.
+
+The owner must be able to review how each payment was allocated.
+
+### Rent changes
+
+Support variable monthly rent and individual adjustments.
+
+When rent is changed, preserve the original charge and payment history. Apply the new rent only to the intended billing periods.
+
+### Advance rent and security deposits
+
+Keep security deposits separate from rent income.
+
+Support:
+
+- Recording a deposit received.
+- Recording advance rent.
+- Applying an eligible advance to a selected rent charge.
+- Recording an authorized deposit deduction for damage or unpaid amounts.
+- Recording the return of a deposit when a tenant leaves.
+- Showing the outstanding refundable deposit balance.
+
+Do not treat refundable security deposits as ordinary rental income.
+
+Require a reason and an audit record for adjustments.
+
+## 7. Utility Bills and Shared Charges
+
+Support both manual billing and meter-based billing.
+
+### Electricity and water
+
+For each applicable unit and billing period, allow either:
+
+1. Manual entry of the bill amount.
+2. Meter-based calculation.
+
+Meter-based billing should record:
+
+- Previous reading.
+- Current reading.
+- Consumption units.
+- Rate per unit.
+- Additional fixed charges, if any.
+- Total calculated amount.
+- Reading date.
+- Notes.
+
+Validate that the current reading is not lower than the previous reading unless an authorized meter-reset or rollover procedure is recorded.
+
+Store the rate and readings used for each bill so that changing future rates does not change historical bills.
+
+### Gas and service charges
+
+Support:
+
+- Fixed monthly charges.
+- Variable charges.
+- Manually entered amounts.
+- Building-level or unit-level charges.
+
+### Shared charges
+
+Allow the owner to enter a shared building expense and assign a custom amount to each selected unit or tenant.
+
+The sum of all allocations must equal the amount being distributed, with any rounding difference explicitly handled.
+
+Support editing allocations before posting. After posting, adjustments must create an auditable correction rather than silently rewriting paid financial history.
+
+Do not force equal division or area-based division because the owner prefers custom allocations.
+
+### Bill payments
+
+Track each bill's:
+
+- Original amount.
+- Amount paid.
+- Outstanding amount.
+- Billing period.
+- Payment date.
+- Payment method.
+- Related tenant and unit.
+- Receipt or reference number, if applicable.
+
+Prevent the same bill from being posted twice for the same period and category unless the owner explicitly creates an additional charge.
+
+## 8. Payment Collection and Receipts
+
+Support the following payment methods:
+
+- Cash.
+- bKash.
+- Nagad.
+- Rocket.
+- Bank transfer.
+- Other manually described methods.
+
+These are payment-recording options only. Do not claim that the application directly processes payments or verifies a mobile financial service transaction unless a real, authorized payment integration is implemented.
+
+Each transaction should record:
+
+- Unique receipt number.
+- Date and time.
+- Building and unit.
+- Tenant.
+- Payment method.
+- Amount received.
+- Allocation to rent, utility bills, service charges, or advance.
+- Optional transaction reference.
+- Optional notes.
+- Recording user.
+- Audit timestamps.
+
+Use a reliable unique numbering strategy that avoids duplicates when records are synchronized between devices.
+
+### Receipt generation
+
+Provide a professional receipt that includes:
+
+- Configurable application or property-owner name.
+- Building and unit details.
+- Tenant name.
+- Receipt number.
+- Payment date.
+- Amount received.
+- Payment method.
+- Billing period.
+- Breakdown of charges and payment allocation.
+- Previous balance, where relevant.
+- Remaining balance.
+- Optional owner signature or logo.
+
+Support:
+
+- Viewing receipts inside the app.
+- Generating PDF receipts.
+- Generating image receipts.
+- Sharing through Android's standard share sheet.
+- Printing where supported.
+
+Use Bengali or English according to the selected language. Verify that Bengali fonts render correctly in PDF and image outputs.
+
+A receipt must not falsely indicate that an amount was paid when the transaction was only saved as a pending or unpaid charge.
+
+Do not expose NID numbers or private tenant documents in a receipt.
+
+## 9. Property Expenses and Financial Accounting
+
+Allow the owner or an authorized manager to record expenses such as:
+
+- Repairs and maintenance.
+- Painting.
+- Cleaning.
+- Security and caretaker wages.
+- Lift maintenance.
+- Common electricity and water.
+- Plumbing.
+- Property taxes or fees.
+- Other expenses.
+
+Each expense should include:
+
+- Building.
+- Optional unit.
+- Category.
+- Amount.
+- Date.
+- Description.
+- Payment method.
+- Optional vendor.
+- Optional attachment or photograph.
+- Recording user.
+
+Support editing and correction through auditable operations.
+
+### Dashboard calculations
+
+Display:
+
+- Total rent charges for the selected period.
+- Total payments collected.
+- Outstanding rent.
+- Outstanding utility and service charges.
+- Total recorded expenses.
+- Net operating cash flow.
+- Security deposits held.
+- Vacant units.
+- Occupied units.
+- Active tenants.
+- Monthly collection rate.
+- Outstanding balances by building.
+
+Clearly distinguish cash collected from rent charged.
+
+Do not subtract refundable security deposits from rental income or incorrectly classify unpaid rent as collected cash.
+
+Document the exact formulas and ensure reports reconcile with transaction records.
+
+## 10. Reminders and Notifications
+
+The required default reminder dates are the 5th, 10th, and 15th of every month.
+
+The app should:
+
+- Check for outstanding rent and bills on these dates.
+- Notify the owner or manager about tenants with outstanding balances.
+- Display an in-app overdue list.
+- Show tenant name, building, unit, outstanding amount, and overdue billing periods.
+- Allow reminders to be enabled or disabled.
+- Allow reminder dates to be configured.
+- Avoid duplicate notifications for the same reminder event.
+- Recheck the outstanding balance before showing a reminder.
+
+Use Android WorkManager or another suitable Android scheduling mechanism, accounting for operating-system background restrictions.
+
+Request notification permission where required.
+
+Local notifications must work without internet, subject to Android scheduling and notification permissions.
+
+Allow the user to share a payment reminder through WhatsApp, SMS, or other compatible apps using Android's share mechanism.
+
+Use a configurable Bengali and English reminder message.
+
+Do not promise automatic WhatsApp delivery or SMS delivery unless an actual authorized integration is implemented.
+
+Do not include NID numbers or unnecessary personal data in reminders.
+
+## 11. Offline-First Database
+
+Use Room with a local SQLite database as the primary data store.
+
+The application must remain useful when the phone has no internet connection.
+
+All core functions must work offline, including:
+
+- Buildings and floors.
+- Units and tenant profiles.
+- Rent charges.
+- Payments.
+- Utility bills.
+- Expenses.
+- Receipts.
+- Reports.
+- Audit history.
+- Local reminders.
+- Backup export and restore.
+
+Design a normalized relational schema with suitable foreign keys, indexes, transactions, and uniqueness constraints.
+
+At minimum, include entities equivalent to:
+
+- UserProfile
+- UserPermission
+- Building
+- Floor
+- RentalUnit
+- Tenant
+- Occupancy
+- LeaseAgreement
+- RentCharge
+- UtilityBill
+- MeterReading
+- SharedCharge
+- SharedChargeAllocation
+- Payment
+- PaymentAllocation
+- Expense
+- SecurityDepositTransaction
+- Receipt
+- ReminderSettings
+- AuditLog
+- SyncMetadata
+- AppSettings
+
+Additional tables may be introduced where appropriate.
+
+Use database migrations rather than destructive schema replacement.
+
+Use atomic database transactions for payment recording, charge generation, allocations, and other multi-step financial operations.
+
+Use integer minor currency units or another precisely documented money representation to avoid floating-point rounding errors.
+
+For BDT, use integer taka and poisha or another exact fixed-precision representation. Do not use floating-point arithmetic for financial balances.
+
+Use consistent date and timestamp storage. Present dates in the selected language and Bangladesh timezone.
+
+Include sample/demo data only if clearly marked as demo data. Never mix sample transactions with real financial records without an explicit choice.
+
+## 12. Multi-Device Synchronization
+
+The user wants the application to work on separate phones and synchronize data when internet connectivity is available.
+
+Implement synchronization as a real, separate capability rather than claiming that local SQLite automatically syncs.
+
+Choose a suitable backend, such as a properly secured Supabase or Firebase implementation, if the environment and project requirements support it.
+
+Before selecting a backend, verify the actual service and SDK capabilities using available documentation or tooling. Do not invent credentials or claim that a project has been created in a third-party account.
+
+Requirements:
+
+- Offline-first local writes.
+- Authenticated synchronization when online.
+- Secure per-property or per-account access.
+- Server-side authorization.
+- Tenant data isolation.
+- Conflict detection and documented resolution rules.
+- Idempotent synchronization.
+- Duplicate-payment prevention.
+- Sync status and last successful synchronization time.
+- Retry handling for temporary network failures.
+- A way to identify failed or conflicting records.
+- Protection against unauthorized cross-account access.
+
+Never silently overwrite financial transactions during conflict resolution.
+
+Treat payments and posted financial transactions as immutable business events where practical. Use explicit corrections or reversals.
+
+If the cloud backend cannot be provisioned because the user has not supplied credentials or access, still deliver a working offline app and a clearly documented synchronization implementation or setup package.
+
+Do not hard-code secrets, service-role keys, or administrator credentials.
+
+Clearly identify which synchronization functions are fully working, which require user configuration, and which remain incomplete.
+
+## 13. Encrypted Backup and Restore
+
+Implement an export and restore workflow.
+
+The backup should include:
+
+- Database records.
+- Tenant photographs and document references.
+- Locally stored tenant images and agreement files where selected.
+- Settings and required metadata.
+- Schema and backup format version.
+
+Support encrypted backup files.
+
+Use a well-established authenticated encryption scheme, such as AES-GCM, with secure key derivation from a user-supplied backup password where appropriate.
+
+Use a unique cryptographically secure nonce for each encryption operation.
+
+Do not store the backup password in plaintext or hard-code the encryption key.
+
+Protect locally stored sensitive files using Android's security capabilities where appropriate.
+
+Provide:
+
+- Create encrypted backup.
+- Choose a destination through Android's file picker.
+- Restore from a selected backup.
+- Verify backup integrity before restore.
+- Show a backup summary.
+- Warn before overwriting existing records.
+- Detect incompatible backup versions.
+- Handle corrupted or incorrect-password backups safely.
+- Export ordinary financial reports separately when appropriate.
+
+For Google Drive backup, use a real supported integration only if it can be configured legitimately. Never imply that cloud backup is operational when it has not been connected or tested.
+
+Test backup and restore using real sample records, including payment history and attached documents.
+
+## 14. Privacy and App Security
+
+Implement:
+
+- PIN lock with a configurable 4- or 6-digit PIN.
+- Biometric authentication where supported.
+- A secure fallback when biometric authentication is unavailable.
+- Appropriate authentication throttling.
+- Secure local storage for sensitive information.
+- Android Keystore where appropriate.
+- Explicit permissions for document and photo access.
+- Private app storage for sensitive attachments.
+- Secure file sharing through FileProvider or equivalent.
+- Safe logging that excludes NID numbers, PINs, passwords, and financial secrets.
+- Owner authorization for sensitive operations.
+- Confirmation before permanent deletion.
+- Audit records for important financial changes.
+
+Explain the distinction between app-level locking and encryption of database files.
+
+If the database itself needs encryption at rest, select a maintained and compatible implementation and verify its availability. Do not claim database encryption merely because the app has a PIN screen.
+
+Do not upload tenant photographs, NID documents, or private records to cloud storage without an explicit, documented synchronization policy and appropriate access controls.
+
+Do not use unnecessary Android permissions.
+
+## 15. Audit History and Data Integrity
+
+Record relevant events, including:
+
+- Rent charge creation and adjustment.
+- Payment creation.
+- Payment allocation changes.
+- Expense creation and correction.
+- Deposit collection and refund.
+- Bill posting and correction.
+- Tenant archive and restore.
+- Important changes to rent and billing settings.
+- User and permission changes.
+- Backup and restore operations.
+
+Audit entries should include the event type, relevant record identifier, timestamp, user, and a safe summary.
+
+Do not allow ordinary editing screens to silently erase financial history.
+
+Use explicit correction or reversal operations where necessary.
+
+Provide an audit history screen with filters by date, building, user, and event type.
+
+## 16. User Interface and Navigation
+
+Create a polished, modern, responsive Material 3 interface.
+
+The app must be usable on ordinary Android phones and should support different screen sizes.
+
+Provide Bengali and English language switching in Settings.
+
+Persist the language selection across app restarts.
+
+Support Bengali and English number formatting and currency display according to the selected language.
+
+Suggested primary navigation:
+
+1. Dashboard.
+2. Buildings.
+3. Tenants.
+4. Rent Collection.
+5. Bills.
+6. Expenses.
+7. Reports.
+8. More / Settings.
+
+Use appropriate icons, readable typography, clear forms, empty states, validation messages, and confirmation dialogs.
+
+The dashboard should include:
+
+- Current month.
+- Total rent due.
+- Collected amount.
+- Outstanding amount.
+- Expenses.
+- Net operating cash flow.
+- Vacant and occupied units.
+- Collection progress.
+- Recent payments.
+- Upcoming or overdue reminders.
+- Monthly income and expense chart.
+
+Provide search and filters for buildings, units, tenants, payments, bills, and expenses.
+
+Avoid displaying every feature on a single crowded screen.
+
+Make the primary workflow straightforward:
+
+Open app → select building/unit or tenant → record payment → allocate payment → save transaction → generate receipt → share receipt.
+
+## 17. Reports and Export
+
+Implement:
+
+- Monthly report.
+- Yearly report.
+- Tenant ledger.
+- Outstanding dues report.
+- Building-wise financial report.
+- Rent collection report.
+- Utility billing report.
+- Expense report.
+- Security deposit report.
+- Occupancy report.
+- Audit history report.
+
+Support date ranges and appropriate building, unit, and tenant filters.
+
+Support CSV or Excel-compatible export where feasible, and provide PDF reports for important financial summaries.
+
+All report totals must derive from the same authoritative database and calculation rules used by the dashboard.
+
+Ensure that:
+
+- Payments are not counted twice.
+- Partial payments reconcile correctly.
+- Deposit balances remain separate from rent income.
+- Outstanding charges remain visible.
+- Archived tenants remain available in historical reports.
+- Corrected transactions do not distort prior periods.
+
+## 18. Error Handling and Usability
+
+Implement clear error handling for:
+
+- Invalid or missing fields.
+- Duplicate monthly charges.
+- Invalid meter readings.
+- Negative amounts where not allowed.
+- Duplicate receipt identifiers.
+- Failed database transactions.
+- Insufficient backup permissions.
+- Wrong backup password.
+- Corrupted backup files.
+- Missing document files.
+- Network failures.
+- Sync conflicts.
+- Notification permission denial.
+- Unsupported biometric authentication.
+
+Show understandable Bengali and English error messages.
+
+Never silently discard a payment or expense.
+
+Do not crash when a user cancels a file picker or sharing operation.
+
+Include a safe empty state for a new installation.
+
+## 19. Testing Requirements
+
+Create automated tests and run every test that the actual environment supports.
+
+### Unit tests
+
+Test:
+
+- Monthly rent generation.
+- Prevention of duplicate monthly charges.
+- Partial payments.
+- Oldest-first allocation.
+- User-selected payment allocation.
+- Overpayment handling.
+- Outstanding balance calculation.
+- Advance rent allocation.
+- Security deposit collection and refunds.
+- Utility meter calculations.
+- Manual utility billing.
+- Shared charge allocation and rounding.
+- Expense totals.
+- Monthly and yearly reporting.
+- Tenant move-in and move-out.
+- Historical rent preservation.
+- Date boundaries and Bangladesh timezone.
+- Money precision.
+- Notification eligibility.
+- Backup encryption and decryption.
+- Backup integrity validation.
+- Sync idempotency and conflict handling.
+
+### Database tests
+
+Test:
+
+- Foreign-key constraints.
+- Transaction rollback.
+- Duplicate prevention.
+- Database migrations.
+- Payment and allocation consistency.
+- Backup and restore consistency.
+
+### UI and integration tests
+
+Test where tooling permits:
+
+- First launch.
+- Owner setup.
+- PIN and biometric flow.
+- Building and unit creation.
+- Tenant registration.
+- Payment collection.
+- Receipt generation.
+- Language switching.
+- Reminder configuration.
+- Backup and restore.
+- Report generation.
+- Offline operation.
+
+### APK verification
+
+If an APK is built:
+
+- Verify that the APK file exists and is non-empty.
+- Verify the APK package metadata and application ID.
+- Verify that it is signed for installation.
+- Verify that the APK can be parsed by Android build tools.
+- Run available lint and build checks.
+- Install and launch it on an emulator or device if one is genuinely available.
+- Report which tests passed, failed, or could not be run.
+
+Do not claim that the APK was installed or tested on a physical phone unless that actually happened.
+
+## 20. Required Project Deliverables
+
+Create a complete, organized project containing:
+
+1. Android source code.
+2. Gradle build configuration.
+3. Gradle wrapper files where feasible.
+4. Android manifest.
+5. Required resources and app icons.
+6. Database entities, DAOs, migrations, and repositories.
+7. UI screens and navigation.
+8. Financial calculation and business logic.
+9. Notification scheduling.
+10. Receipt and report generation.
+11. Backup and restore implementation.
+12. Tests.
+13. README with build and installation instructions.
+14. Database schema documentation.
+15. A clear explanation of synchronization setup.
+16. Sample configuration files without secrets.
+17. An automated build workflow if direct APK compilation is unavailable.
+18. The actual installable APK if the environment permits it.
+19. A build and test report.
+20. A list of incomplete features and required external configuration.
+
+Use a sensible project structure, consistent naming, and maintainable architecture.
+
+Do not leave critical functions as empty stubs, TODO comments, fake buttons, hard-coded example data, or mock responses while presenting them as finished.
+
+If a feature cannot be implemented, label it clearly and explain what is missing.
+
+## 21. Required Development Workflow
+
+Follow these stages in order:
+
+### Stage A: Environment inspection
+
+Inspect available tools, operating system, JDK, Gradle, Android SDK, network access, and artifact-delivery capability.
+
+Select a build approach based on verified capabilities.
+
+### Stage B: Implementation design
+
+Create a short architecture plan, database schema, navigation map, and financial calculation rules.
+
+Do not stop at this stage.
+
+### Stage C: Core application implementation
+
+Build the working local application first, including:
+
+- Buildings and units.
+- Tenant profiles.
+- Monthly rent charges.
+- Payment collection and allocations.
+- Utility bills.
+- Expenses.
+- Dashboard and reports.
+- Receipt generation.
+- Local reminders.
+- App security.
+- Backup and restore.
+
+### Stage D: Synchronization
+
+Implement the actual synchronization architecture or a clearly documented integration that can be configured without changing the core business logic.
+
+Do not make synchronization a dependency for basic offline operation.
+
+### Stage E: Testing
+
+Run available automated tests, fix discovered defects, and rerun the affected tests.
+
+### Stage F: APK build
+
+Build the release APK using the available environment.
+
+Use a suitable release signing configuration. If a private signing key cannot safely be generated or retained in the current environment, document the limitation and provide a safe reproducible signing procedure.
+
+Never include a private signing key or password in a public repository.
+
+### Stage G: Artifact verification
+
+Confirm the actual output paths and verify the resulting APK.
+
+If possible, test installation and startup on an emulator or device.
+
+### Stage H: Delivery
+
+Provide the actual files or verified artifact links.
+
+Explain how to install the APK on an Android phone, including any Android installation confirmation or unknown-source permission that may be required.
+
+## 22. Acceptance Criteria
+
+The application is not considered complete merely because it compiles.
+
+The core release must satisfy the following:
+
+- A real Android APK is produced and its existence is verified.
+- The APK is signed and suitable for installation.
+- The app launches successfully in the available test environment.
+- Building, floor, unit, and tenant records can be created and retained.
+- Monthly rent charges are generated without duplication.
+- Full and partial payments work correctly.
+- Outstanding balances reconcile with charges and allocations.
+- Utility bills can be entered manually and calculated from meter readings.
+- Custom shared charges reconcile with their allocations.
+- Deposits remain separate from rent income.
+- Expenses affect the correct financial reports.
+- Receipts can be generated and shared in supported formats.
+- The interface supports Bengali and English.
+- Local reminders are scheduled and eligibility is checked against outstanding balances.
+- Encrypted backup and restore work for supported data and attachments.
+- The app works without internet for its core features.
+- Synchronization status and limitations are accurately disclosed.
+- No critical security credentials are hard-coded.
+- Automated tests are run and results are reported honestly.
+
+If a requirement cannot be met, state it explicitly rather than falsely marking the acceptance criterion as passed.
+
+## 23. Final Response Format
+
+When development is finished, respond with the following sections:
+
+### A. Deliverables
+List each created artifact and its verified path or download link.
+
+### B. APK Build Status
+State whether the APK was actually built, its package/application ID, version, file size, and signing status, using verified values only.
+
+### C. Installation Instructions
+Give simple steps for installing the APK on an Android phone.
+
+### D. Implemented Features
+List the features that are actually implemented and tested.
+
+### E. Test Results
+Provide the tests run, results, and any tests that could not be run.
+
+### F. Synchronization and Backup
+Explain what works offline, what synchronizes, and whether any external account or configuration is still needed.
+
+### G. Remaining Limitations
+List incomplete functionality, external setup requirements, and any important known defects.
+
+### H. Source Code
+Provide the complete project files or a verified downloadable project archive if the environment supports it.
+
+Do not respond with only a code snippet or instructions for the user to create the application manually.
+
+Do not claim to have created, compiled, signed, installed, uploaded, or tested anything unless the relevant operation actually succeeded.
+
+## Final Instruction
+
+Begin by inspecting your available environment and selecting the most practical verified build strategy.
+
+Then implement the application, run tests, fix defects, and build the APK whenever possible.
+
+Prioritize a dependable offline rent and property management application over decorative features. Preserve financial accuracy, privacy, and data integrity throughout development.
+
+The desired outcome is that the user can receive the APK, install it on an Android phone, and begin managing real properties and rent payments without needing to install Android Studio or configure an Android SDK on their own PC.
